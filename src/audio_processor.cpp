@@ -1,6 +1,7 @@
 #include "audio_processor.h"
 #include "project_config.h"
 #include "driver/i2s.h"
+#include "arduinoFFT.h"
 
 static float audioBuffer[I2S_BUFFER_SIZE];
 static volatile float volumeEnvelope = 0.0f;
@@ -8,6 +9,13 @@ static volatile float peakAmplitude = 0.0f;
 static volatile bool newBufferReady = false;
 
 static TaskHandle_t audioTaskHandle = NULL;
+
+// FFT Globals
+static float vReal[I2S_BUFFER_SIZE];
+static float vImag[I2S_BUFFER_SIZE];
+static ArduinoFFT<float> FFT(vReal, vImag, I2S_BUFFER_SIZE, I2S_SAMPLE_RATE);
+static float frequencyBands[7];
+static float bandPeaks[7] = {500.0f, 500.0f, 500.0f, 500.0f, 500.0f, 500.0f, 500.0f};
 
 namespace AudioProcessor {
 
@@ -146,6 +154,99 @@ bool isNewBufferReady() {
 
 void clearNewBufferFlag() {
     newBufferReady = false;
+}
+
+float* getFrequencyBands() {
+    return frequencyBands;
+}
+
+uint8_t getNumBands() {
+    return 7;
+}
+
+void runFFT() {
+    // Copy samples from active audioBuffer to vReal to prevent race conditions with DMA task
+    for (uint16_t i = 0; i < I2S_BUFFER_SIZE; i++) {
+        vReal[i] = audioBuffer[i];
+        vImag[i] = 0.0f;
+    }
+
+    // Process FFT
+    FFT.windowing(FFT_WIN_TYP_HAMMING, FFT_FORWARD);
+    FFT.compute(FFT_FORWARD);
+    FFT.complexToMagnitude();
+
+    // Group frequency bins logarithmically into 7 bands:
+    // Resolution per bin is 16000 / 256 = 62.5 Hz.
+    // 0: Sub-Bass (~62.5Hz - 125Hz) - Bins 1..2
+    // 1: Bass (~187.5Hz - 312.5Hz) - Bins 3..5
+    // 2: Mid-Bass (~375Hz - 625Hz) - Bins 6..10
+    // 3: Mids (~687.5Hz - 1187.5Hz) - Bins 11..19
+    // 4: High-Mids (~1250Hz - 2187.5Hz) - Bins 20..35
+    // 5: Presence (~2250Hz - 3937.5Hz) - Bins 36..63
+    // 6: Brilliance (~4000Hz - 7500Hz) - Bins 64..120
+
+    float averages[7];
+
+    // Band 0: Bins 1..2
+    float val0 = 0;
+    for (int i = 1; i <= 2; i++) val0 += vReal[i];
+    averages[0] = val0 / 2.0f;
+
+    // Band 1: Bins 3..5
+    float val1 = 0;
+    for (int i = 3; i <= 5; i++) val1 += vReal[i];
+    averages[1] = val1 / 3.0f;
+
+    // Band 2: Bins 6..10
+    float val2 = 0;
+    for (int i = 6; i <= 10; i++) val2 += vReal[i];
+    averages[2] = val2 / 5.0f;
+
+    // Band 3: Bins 11..19
+    float val3 = 0;
+    for (int i = 11; i <= 19; i++) val3 += vReal[i];
+    averages[3] = val3 / 9.0f;
+
+    // Band 4: Bins 20..35
+    float val4 = 0;
+    for (int i = 20; i <= 35; i++) val4 += vReal[i];
+    averages[4] = val4 / 16.0f;
+
+    // Band 5: Bins 36..63
+    float val5 = 0;
+    for (int i = 36; i <= 63; i++) val5 += vReal[i];
+    averages[5] = val5 / 28.0f;
+
+    // Band 6: Bins 64..120
+    float val6 = 0;
+    for (int i = 64; i <= 120; i++) val6 += vReal[i];
+    averages[6] = val6 / 57.0f;
+
+    // Apply noise floor subtraction, dynamic AGC, and peak tracking
+    float minPeak = 100.0f;
+    for (int i = 0; i < 7; i++) {
+        // Subtract a frequency-dependent noise floor (higher frequencies have more noise)
+        float noiseFloor = 15.0f + (i * 2.5f);
+        averages[i] -= noiseFloor;
+        if (averages[i] < 0.0f) averages[i] = 0.0f;
+
+        // Auto-Gain Control peak tracking
+        if (averages[i] > bandPeaks[i]) {
+            bandPeaks[i] = bandPeaks[i] * 0.2f + averages[i] * 0.8f; // Fast attack
+        } else {
+            bandPeaks[i] = bandPeaks[i] * 0.996f + averages[i] * 0.004f; // Slow decay
+        }
+
+        if (bandPeaks[i] < minPeak) bandPeaks[i] = minPeak;
+
+        // Normalize
+        float norm = averages[i] / bandPeaks[i];
+        if (norm > 1.0f) norm = 1.0f;
+
+        // Output temporal smoothing filter (reduces visual jitter)
+        frequencyBands[i] = frequencyBands[i] * 0.25f + norm * 0.75f;
+    }
 }
 
 } // namespace AudioProcessor

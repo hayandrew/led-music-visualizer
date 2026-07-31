@@ -21,6 +21,15 @@ namespace AudioProcessor {
 
     // Reset the new buffer flag after reading
     void clearNewBufferFlag();
+
+    // Get a pointer to the 7 frequency band amplitudes (normalized 0.0 to 1.0)
+    float* getFrequencyBands();
+
+    // Get the number of frequency bands (7)
+    uint8_t getNumBands();
+
+    // Run the FFT calculation on the active audio buffer
+    void runFFT();
 }
 
 #endif // AUDIO_PROCESSOR_H

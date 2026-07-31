@@ -2,7 +2,7 @@
 #include <WiFi.h>
 #include <ArduinoOTA.h>
 #include "project_config.h"
-#include "led_diagnostics.h"
+#include "led_manager.h"
 #include "audio_processor.h"
 
 void setup() {
@@ -57,8 +57,8 @@ void setup() {
   // Initialize I2S Audio Processor
   AudioProcessor::init();
 
-  // Initialize LEDs
-  LEDDiagnostics::init();
+  // Initialize LEDs via Manager
+  LEDManager::init();
 
   Serial.println("=== Setup Complete. Entering loop ===\n");
 }
@@ -67,16 +67,42 @@ void loop() {
   // Handle OTA update check
   ArduinoOTA.handle();
 
-  // Run visualizer diagnostic cycles
-  LEDDiagnostics::update();
+  // 1. Run FFT calculation if background I2S buffer is filled
+  if (AudioProcessor::isNewBufferReady()) {
+    AudioProcessor::runFFT();
+    AudioProcessor::clearNewBufferFlag();
+  }
 
-  // Print volume statistics to Serial Monitor every 100ms
+  // 2. Auto-cycle visualizer modes every 15 seconds
+  static unsigned long lastModeSwitch = millis();
+  if (millis() - lastModeSwitch >= 15000) {
+    lastModeSwitch = millis();
+    LEDManager::nextMode();
+  }
+
+  // 3. Handle Serial commands to switch modes manually
+  if (Serial.available()) {
+    char c = Serial.read();
+    if (c == 'n' || c == ' ') {
+      LEDManager::nextMode();
+      lastModeSwitch = millis();
+    } else if (c >= '0' && c <= '6') {
+      LEDManager::setMode((VisualizerMode)(c - '0'));
+      lastModeSwitch = millis();
+    }
+  }
+
+  // 4. Update the visualizer animation frame
+  LEDManager::update();
+
+  // Print volume statistics to Serial Monitor every 500ms
   static unsigned long lastPrint = 0;
-  if (millis() - lastPrint >= 100) {
+  if (millis() - lastPrint >= 500) {
     lastPrint = millis();
-    Serial.printf("[Audio] Peak: %.2f | Envelope: %.2f\n", 
+    Serial.printf("[Audio] Peak: %.2f | Env: %.2f | Active Mode: %s\n", 
                   AudioProcessor::getPeakAmplitude(), 
-                  AudioProcessor::getVolumeEnvelope());
+                  AudioProcessor::getVolumeEnvelope(),
+                  LEDManager::getModeName(LEDManager::getActiveMode()));
   }
 
   // Yield to keep the Wi-Fi/IP stack healthy
