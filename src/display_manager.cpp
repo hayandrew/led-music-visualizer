@@ -6,6 +6,7 @@
 #include "project_config.h"
 #include "led_manager.h"
 #include "audio_processor.h"
+#include <cmath>
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -18,6 +19,17 @@ namespace DisplayManager {
     // Scrolling diagnostics buffer
     static float history[128] = {0.0f};
     static int historyIndex = 0;
+
+    // Centered text drawing helper
+    void drawCenteredText(const char* text, int y, int size) {
+        int len = strlen(text);
+        int charWidth = (size == 1) ? 6 : 12;
+        int x = (128 - (len * charWidth)) / 2;
+        if (x < 0) x = 0;
+        display.setTextSize(size);
+        display.setCursor(x, y);
+        display.print(text);
+    }
 
     // Helper to get shortened mode names that fit on the 128px screen width
     const char* getShortModeName(VisualizerMode mode) {
@@ -63,58 +75,82 @@ namespace DisplayManager {
         display.clearDisplay();
 
         // Header Title
-        display.setTextSize(1);
-        display.setCursor(4, 0);
-        display.print("=== LED VISUALIZER ===");
+        display.setTextColor(SSD1306_WHITE);
+        drawCenteredText("ANDY vs MACHINE", 0, 1);
         display.drawFastHLine(0, 9, 128, SSD1306_WHITE);
 
         // Fetch active settings and controls state
         int cursor = ControlsManager::getMenuCursor();
         bool editing = ControlsManager::isEditing();
 
-        // Render Menu Items
-        for (int i = 0; i < 4; i++) {
-            int y = 12 + i * 9;
-            display.setCursor(2, y);
+        // Render Focused Category Option Label
+        switch (cursor) {
+            case 0: drawCenteredText("1/4: Visualizer Mode", 14, 1); break;
+            case 1: drawCenteredText("2/4: LED Brightness", 14, 1); break;
+            case 2: drawCenteredText("3/4: Microphone Gain", 14, 1); break;
+            case 3: drawCenteredText("4/4: Auto-Cycling", 14, 1); break;
+        }
 
-            // Display item labels
-            if (i == 0) display.print("Mode: ");
-            else if (i == 1) display.print("Bright: ");
-            else if (i == 2) display.print("Gain: ");
-            else if (i == 3) display.print("Auto: ");
-
-            // Cursor and Brackets Formatting
-            if (cursor == i) {
-                if (editing) {
-                    display.print(">"); // Bracket indicating active parameter edit
-                } else {
-                    display.print("["); // Bracket indicating active menu navigation selection
-                }
+        // Render Focused Parameter Value or Progress Bar
+        if (cursor == 0) {
+            drawCenteredText(getShortModeName(LEDManager::getActiveMode()), 26, 2);
+            if (editing) {
+                display.fillTriangle(4, 29, 4, 39, 10, 34, SSD1306_WHITE);
+                display.fillTriangle(124, 29, 124, 39, 118, 34, SSD1306_WHITE);
+            }
+        } else if (cursor == 1) {
+            int pct = (int)round((LEDManager::getBrightness() * 100.0) / 255.0);
+            if (editing) {
+                // Draw progress bar on the left (80px wide, x=8 to 88)
+                int fillWidth = (pct * 80) / 100;
+                if (fillWidth > 80) fillWidth = 80;
+                if (fillWidth < 0) fillWidth = 0;
+                
+                display.drawRect(8, 28, 80, 12, SSD1306_WHITE);
+                display.fillRect(8, 28, fillWidth, 12, SSD1306_WHITE);
+                
+                char buf[8];
+                sprintf(buf, "%d%%", pct);
+                int tx = 112 - (strlen(buf) * 3); // Center of right-hand column (x=96 to 127)
+                display.setTextColor(SSD1306_WHITE);
+                display.setTextSize(1);
+                display.setCursor(tx, 30);
+                display.print(buf);
             } else {
-                display.print(" ");
+                char buf[8];
+                sprintf(buf, "%d%%", pct);
+                drawCenteredText(buf, 26, 2);
             }
-
-            // Render current values
-            if (i == 0) {
-                display.print(getShortModeName(LEDManager::getActiveMode()));
-            } else if (i == 1) {
-                int pct = (LEDManager::getBrightness() * 100) / 255;
-                display.print(pct);
-                display.print("%");
-            } else if (i == 2) {
-                display.print(AudioProcessor::getGain(), 1);
-                display.print("x");
-            } else if (i == 3) {
-                display.print(LEDManager::getAutoCycle() ? "ON" : "OFF");
+        } else if (cursor == 2) {
+            float g = AudioProcessor::getGain();
+            if (editing) {
+                // Draw progress bar for gain on the left (0.2x to 5.0x mapped to 0-80px)
+                float gainPct = ((g - 0.2f) / (5.0f - 0.2f)) * 100.0f;
+                int fillWidth = (int)((gainPct * 80.0f) / 100.0f);
+                if (fillWidth > 80) fillWidth = 80;
+                if (fillWidth < 0) fillWidth = 0;
+                
+                display.drawRect(8, 28, 80, 12, SSD1306_WHITE);
+                display.fillRect(8, 28, fillWidth, 12, SSD1306_WHITE);
+                
+                char buf[8];
+                sprintf(buf, "%.1fx", g);
+                int tx = 112 - (strlen(buf) * 3); // Center of right-hand column (x=96 to 127)
+                display.setTextColor(SSD1306_WHITE);
+                display.setTextSize(1);
+                display.setCursor(tx, 30);
+                display.print(buf);
+            } else {
+                char buf[8];
+                sprintf(buf, "%.1fx", g);
+                drawCenteredText(buf, 26, 2);
             }
-
-            // Close brackets
-            if (cursor == i) {
-                if (editing) {
-                    display.print("<");
-                } else {
-                    display.print("]");
-                }
+        } else if (cursor == 3) {
+            bool ac = LEDManager::getAutoCycle();
+            drawCenteredText(ac ? "ON" : "OFF", 26, 2);
+            if (editing) {
+                display.fillTriangle(4, 29, 4, 39, 10, 34, SSD1306_WHITE);
+                display.fillTriangle(124, 29, 124, 39, 118, 34, SSD1306_WHITE);
             }
         }
 

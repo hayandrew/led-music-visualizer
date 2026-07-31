@@ -2,6 +2,7 @@
 #include "project_config.h"
 #include "led_manager.h"
 #include "audio_processor.h"
+#include <cmath>
 
 namespace ControlsManager {
     ControlState currentState = STATE_NAV;
@@ -119,14 +120,15 @@ namespace ControlsManager {
                         Serial.printf("[Controls] Mode changed to: %s\n", LEDManager::getModeName((VisualizerMode)currentModeInt));
                         break;
                     }
-                    case 1: { // Brightness (Step by 25, 10 to 255)
-                        int b = LEDManager::getBrightness();
-                        b += delta * 25;
-                        if (b < 10) b = 10;       // Minimum brightness
-                        if (b > 255) b = 255;     // Maximum brightness
+                    case 1: { // Brightness (Step by 5%, 0% to 100%)
+                        int currentPct = (int)round((LEDManager::getBrightness() * 100.0) / 255.0);
+                        int nextPct = currentPct + delta * 5;
+                        if (nextPct < 0) nextPct = 0;
+                        if (nextPct > 100) nextPct = 100;
                         
+                        int b = (nextPct * 255) / 100;
                         LEDManager::setBrightness((uint8_t)b);
-                        Serial.printf("[Controls] Brightness changed to: %d\n", b);
+                        Serial.printf("[Controls] Brightness changed to: %d%% (%d/255)\n", nextPct, b);
                         break;
                     }
                     case 2: { // Gain (Step by 0.2, 0.2 to 5.0)
