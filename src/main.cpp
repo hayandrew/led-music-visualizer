@@ -13,13 +13,41 @@ void setup() {
   delay(1000);
   Serial.println("\n=== ESP32-C3 LED Visualizer Starting ===");
 
-  // Initialize Wi-Fi in Access Point (AP) mode
-  Serial.printf("[WiFi] Starting Access Point: %s...\n", AP_SSID);
-  WiFi.softAP(AP_SSID, AP_PASSWORD);
+  // Configure static IP to speed up connection and match reference setup
+  WiFi.mode(WIFI_STA);
+  IPAddress local_IP(192, 168, 68, 50);
+  IPAddress gateway(192, 168, 68, 1);
+  IPAddress subnet(255, 255, 255, 0);
+  IPAddress primaryDNS(8, 8, 8, 8);
+  IPAddress secondaryDNS(8, 8, 4, 4);
 
-  IPAddress myIP = WiFi.softAPIP();
-  Serial.print("[WiFi] AP IP address: ");
-  Serial.println(myIP);
+  if (!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS)) {
+    Serial.println("[WiFi] Static IP configuration failed!");
+  }
+
+  // Connect to home Wi-Fi using preprocessor macros injected by load_env.py
+  #if defined(WIFI_SSID) && defined(WIFI_PASS)
+    Serial.printf("[WiFi] Connecting to SSID: %s...\n", WIFI_SSID);
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+  #else
+    #error "WIFI_SSID and WIFI_PASS must be defined in .env!"
+  #endif
+
+  // Wait for connection with a timeout
+  int retries = 0;
+  while (WiFi.status() != WL_CONNECTED && retries < 20) {
+    delay(500);
+    Serial.print(".");
+    retries++;
+  }
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n[WiFi] Connected successfully!");
+    Serial.print("[WiFi] IP Address: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\n[WiFi] Connection failed! Operating offline.");
+  }
 
   // Set up OTA port (default is 3232, but standard is fine)
   ArduinoOTA.setPort(3232);
