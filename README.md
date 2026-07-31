@@ -43,21 +43,23 @@ This project is divided into several iterative phases:
 * Implemented volume envelope and peak amplitude tracking.
 * Connected the volume envelope to scale the diagnostics LED heartbeat animation in real-time.
 
-### **Phase 3: FFT Frequency Analysis** (⏳ Remaining)
-* Integrate an FFT library (e.g., `arduinoFFT` or Espressif's `esp-dsp`).
-* Run frequency analysis on the audio sample buffer.
-* Sort frequencies into groups (Bass, Mids, Treble) for precise frequency-based animations.
+### **Phase 3: FFT Frequency Analysis** (✅ Complete)
+* Integrated the `arduinoFFT` library to compute fast Fourier transforms on incoming audio data.
+* Sorted frequencies into 7 bands (Sub-Bass to Brilliance) with dynamic automatic gain control (AGC) tracking.
+* Isolated processing from the DMA capture loop to maintain high animation frame rates.
 
-### **Phase 4: Audio-Reactive Visualization Modes** (⏳ Remaining)
-* Implement spectrum analyzer bars mapped to the 15x17 grid.
-* Add a volume-responsive color VU meter.
-* Develop frequency-reactive custom effects (e.g., bass pulsing, color organ, lava/fire ripples).
+### **Phase 4: Audio-Reactive Visualization Modes** (✅ Complete)
+* Implemented linear and symmetric spectrum visualizer bars.
+* Added a dual VU meter reacting to peak amplitude and volume envelope.
+* Developed custom frequency-reactive effects including Bass Pulsing circles and Sound Ripple expansions.
 
-### **Phase 5: Web Configuration Portal** (⏳ Remaining)
-* Serve a responsive web dashboard from the ESP32 AP.
-* Add sliders for global brightness, microphone gain, and noise gate threshold.
-* Implement buttons to cycle through visualizer modes and select customized color palettes.
-* Persist user configurations in non-volatile flash memory (SPIFFS/Preferences).
+### **Phase 5: Web Configuration Portal** (✅ Complete)
+* Developed a responsive glassmorphic dark-mode web control panel served directly from the ESP32.
+* Configured a non-blocking WebSocket endpoint (`/ws`) on port 80 to sync settings and stream live audio statistics at 20 FPS.
+* Implemented control sliders for global brightness and microphone gain.
+* Added manual mode selector buttons and a toggle to enable/disable the 15-second visualizer auto-cycle.
+* *(⏳ Remaining)* Persist user configurations in non-volatile flash memory (Preferences/NVS).
+
 
 ---
 

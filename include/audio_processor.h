@@ -30,6 +30,12 @@ namespace AudioProcessor {
 
     // Run the FFT calculation on the active audio buffer
     void runFFT();
+
+    // Set the gain multiplier for incoming audio
+    void setGain(float gain);
+
+    // Get the current gain multiplier
+    float getGain();
 }
 
 #endif // AUDIO_PROCESSOR_H

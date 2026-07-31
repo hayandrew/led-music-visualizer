@@ -7,6 +7,7 @@ static float audioBuffer[I2S_BUFFER_SIZE];
 static volatile float volumeEnvelope = 0.0f;
 static volatile float peakAmplitude = 0.0f;
 static volatile bool newBufferReady = false;
+static volatile float audioGain = 1.0f;
 
 static TaskHandle_t audioTaskHandle = NULL;
 
@@ -45,7 +46,7 @@ void audioCaptureTask(void* parameter) {
             for (uint16_t i = 0; i < samples_count; i++) {
                 // Convert 32-bit slot sample (24-bit MSB-aligned data)
                 // Shift right by 14 to convert to a reasonable float range
-                float raw_val = (float)(i2s_raw_samples[i] >> 14);
+                float raw_val = (float)(i2s_raw_samples[i] >> 14) * audioGain;
                 
                 // Apply a standard IIR DC Block filter: y[n] = x[n] - x[n-1] + 0.995 * y[n-1]
                 float filtered = raw_val - last_x + 0.995f * last_y;
@@ -247,6 +248,16 @@ void runFFT() {
         // Output temporal smoothing filter (reduces visual jitter)
         frequencyBands[i] = frequencyBands[i] * 0.25f + norm * 0.75f;
     }
+}
+
+void setGain(float gain) {
+    if (gain < 0.1f) gain = 0.1f;
+    if (gain > 10.0f) gain = 10.0f;
+    audioGain = gain;
+}
+
+float getGain() {
+    return audioGain;
 }
 
 } // namespace AudioProcessor

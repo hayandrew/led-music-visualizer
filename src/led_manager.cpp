@@ -5,6 +5,7 @@
 
 static CRGB leds[NUM_LEDS];
 static VisualizerMode currentMode = MODE_SPECTRUM_SYMMETRIC; // Start with mirrored spectrum
+static bool autoCycleEnabled = true;
 
 // Serpentine Index Mapping
 uint16_t getLEDIndex(uint8_t x, uint8_t y) {
@@ -468,6 +469,22 @@ const char* getModeName(VisualizerMode mode) {
 
 VisualizerMode getActiveMode() {
     return currentMode;
+}
+
+void setBrightness(uint8_t brightness) {
+    FastLED.setBrightness(brightness);
+}
+
+uint8_t getBrightness() {
+    return FastLED.getBrightness();
+}
+
+void setAutoCycle(bool enabled) {
+    autoCycleEnabled = enabled;
+}
+
+bool getAutoCycle() {
+    return autoCycleEnabled;
 }
 
 } // namespace LEDManager

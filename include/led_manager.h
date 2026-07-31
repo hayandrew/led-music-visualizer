@@ -32,6 +32,18 @@ namespace LEDManager {
 
     // Get the currently active mode
     VisualizerMode getActiveMode();
+
+    // Set global brightness (0-255)
+    void setBrightness(uint8_t brightness);
+
+    // Get current global brightness
+    uint8_t getBrightness();
+
+    // Set auto-cycle enabled/disabled
+    void setAutoCycle(bool enabled);
+
+    // Get auto-cycle status
+    bool getAutoCycle();
 }
 
 #endif // LED_MANAGER_H
