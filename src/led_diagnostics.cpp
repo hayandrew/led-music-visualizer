@@ -1,12 +1,9 @@
 #include <FastLED.h>
-#include "config.h"
+#include "project_config.h"
 #include "led_diagnostics.h"
+#include "audio_processor.h"
 
 static CRGB leds[NUM_LEDS];
-static unsigned long lastPatternChange = 0;
-static int currentPattern = 0;
-static int chaseIndex = 0;
-static unsigned long lastChaseStep = 0;
 
 namespace LEDDiagnostics {
 
@@ -27,119 +24,95 @@ void init() {
     // Initialize FastLED with GRB color order on LED_PIN
     FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
     
-    // Set a safe global brightness level (40 out of 255, approx 15% brightness)
+    // Set a safe global brightness level (45 out of 255, approx 17% brightness)
     // to prevent drawing excessive current from a USB power source
-    FastLED.setBrightness(40);
+    FastLED.setBrightness(45);
     FastLED.clear();
     FastLED.show();
     
-    Serial.println("[LED] FastLED Initialized in Serpentine Mode.");
+    Serial.println("[LED] FastLED Initialized in Serpentine Mode. Running Audio-Reactive Heartbeat.");
 }
 
 void update() {
     unsigned long now = millis();
     
-    // Switch diagnostic mode every 6 seconds
-    if (now - lastPatternChange >= 6000) {
-        currentPattern = (currentPattern + 1) % 7;
-        lastPatternChange = now;
-        FastLED.clear();
-        chaseIndex = 0;
-        Serial.printf("[LED] Switched to Diagnostic Pattern %d\n", currentPattern);
+    // 1. Calculate time-based heartbeat contraction pulse
+    // Standard heartbeat has a double beat: thump-thump, then a pause.
+    // Cycle duration: 1000ms
+    unsigned long cycleMs = now % 1000;
+    float basePulse = 1.0f;
+    
+    if (cycleMs < 120) {
+        // First thump: rapid expand
+        float t = cycleMs / 120.0f;
+        basePulse = 0.9f + 0.35f * sin(t * HALF_PI);
+    } else if (cycleMs < 240) {
+        // First thump relaxation
+        float t = (cycleMs - 120) / 120.0f;
+        basePulse = 1.25f - 0.25f * sin(t * HALF_PI);
+    } else if (cycleMs < 360) {
+        // Second thump: smaller rapid expand
+        float t = (cycleMs - 240) / 120.0f;
+        basePulse = 1.0f + 0.18f * sin(t * HALF_PI);
+    } else if (cycleMs < 480) {
+        // Second thump relaxation
+        float t = (cycleMs - 360) / 120.0f;
+        basePulse = 1.18f - 0.28f * sin(t * HALF_PI);
+    } else {
+        // Resting phase: slight breathing
+        float t = (cycleMs - 480) / 520.0f;
+        basePulse = 0.9f - 0.05f * sin(t * PI);
     }
 
-    switch (currentPattern) {
-        case 0: // 2D Rainbow Wave
-            for (uint8_t x = 0; x < MATRIX_WIDTH; x++) {
-                for (uint8_t y = 0; y < MATRIX_HEIGHT; y++) {
-                    // Create a diagonal shifting rainbow based on coordinates and time
-                    uint8_t hue = (x * 12) + (y * 8) + (now / 15);
-                    leds[getLEDIndex(x, y)] = CHSV(hue, 255, 255);
-                }
-            }
-            break;
+    // 2. Fetch the microphone volume envelope and calculate sound scale
+    float env = AudioProcessor::getVolumeEnvelope();
+    
+    // Noise floor subtraction (tweak if baseline noise is higher/lower)
+    float netEnv = env - 200.0f;
+    if (netEnv < 0.0f) netEnv = 0.0f;
 
-        case 1: { // Math-modeled Pulsating Heartbeat
-            // Standard heartbeat has a double beat: thump-thump, then a pause.
-            // Cycle duration: 1000ms
-            unsigned long cycleMs = now % 1000;
-            float pulseScale = 1.0f;
+    // Normalize against a reference max volume
+    float maxRef = 45000.0f;
+    float normEnv = netEnv / maxRef;
+    if (normEnv > 1.0f) normEnv = 1.0f;
+    
+    // Apply a square-root compression curve to make the heart highly responsive to voice
+    float soundFactor = sqrt(normEnv); // 0.0 to 1.0
+
+    // Map soundFactor to baseline scale: 0.3f (silence) to 1.1f (maximum loudness)
+    float baselineScale = 0.3f + 0.8f * soundFactor;
+
+    // Combine base heartbeat pulse with sound-reactive scale
+    float pulseScale = baselineScale * (0.85f + 0.15f * basePulse);
+
+    // 3. Render heart shape on matrix using the algebraic formula
+    float cx = (MATRIX_WIDTH - 1) / 2.0f;     // Center X: 7.0
+    float cy = (MATRIX_HEIGHT - 1) / 2.0f + 1; // Center Y: 9.0 (offset slightly for heart geometry)
+
+    for (uint8_t x = 0; x < MATRIX_WIDTH; x++) {
+        for (uint8_t y = 0; y < MATRIX_HEIGHT; y++) {
+            // Map coordinates to standard heart space, scaling size with pulseScale
+            float dx = (x - cx) / (4.5f * pulseScale);
+            float dy = (y - cy) / (5.0f * pulseScale);
             
-            if (cycleMs < 120) {
-                // First thump: rapid expand
-                float t = cycleMs / 120.0f;
-                pulseScale = 0.9f + 0.35f * sin(t * HALF_PI);
-            } else if (cycleMs < 240) {
-                // First thump relaxation
-                float t = (cycleMs - 120) / 120.0f;
-                pulseScale = 1.25f - 0.25f * sin(t * HALF_PI);
-            } else if (cycleMs < 360) {
-                // Second thump: smaller rapid expand
-                float t = (cycleMs - 240) / 120.0f;
-                pulseScale = 1.0f + 0.18f * sin(t * HALF_PI);
-            } else if (cycleMs < 480) {
-                // Second thump relaxation
-                float t = (cycleMs - 360) / 120.0f;
-                pulseScale = 1.18f - 0.28f * sin(t * HALF_PI);
+            // Heart algebraic equation: (x^2 + y^2 - 1)^3 - x^2 * y^3 <= 0
+            float a = dx * dx + dy * dy - 1.0f;
+            float heartVal = a * a * a - dx * dx * dy * dy * dy;
+
+            uint16_t idx = getLEDIndex(x, y);
+            if (heartVal <= 0.0f) {
+                // Heart color: Pulsating Red
+                // Make the red brightness slightly responsive to the sound level for extra visual punch!
+                uint8_t redVal = 180 + 75 * soundFactor;
+                leds[idx] = CRGB(redVal, 0, 30);
             } else {
-                // Resting phase: slight breathing
-                float t = (cycleMs - 480) / 520.0f;
-                pulseScale = 0.9f - 0.05f * sin(t * PI);
+                // Faint, breathing background glow
+                // Intensity scales up slightly with sound level
+                float bgIntensity = 3.0f + 8.0f * (pulseScale - 0.25f);
+                if (bgIntensity < 1.0f) bgIntensity = 1.0f;
+                leds[idx] = CRGB(bgIntensity * 0.3f, 0, bgIntensity * 0.7f);
             }
-
-            // Draw on matrix
-            float cx = (MATRIX_WIDTH - 1) / 2.0f;     // Center X: 7.0
-            float cy = (MATRIX_HEIGHT - 1) / 2.0f + 1; // Center Y: 9.0 (slightly elevated for heart shape geometry)
-
-            for (uint8_t x = 0; x < MATRIX_WIDTH; x++) {
-                for (uint8_t y = 0; y < MATRIX_HEIGHT; y++) {
-                    // Map coordinate to heart space, scaling size with pulseScale
-                    float dx = (x - cx) / (4.5f * pulseScale);
-                    float dy = (y - cy) / (5.0f * pulseScale);
-                    
-                    // Heart algebraic formula: (x^2 + y^2 - 1)^3 - x^2 * y^3 <= 0
-                    float a = dx * dx + dy * dy - 1.0f;
-                    float heartVal = a * a * a - dx * dx * dy * dy * dy;
-
-                    uint16_t idx = getLEDIndex(x, y);
-                    if (heartVal <= 0.0f) {
-                        // Pulsating Crimson/Red for the heart body
-                        leds[idx] = CRGB(220, 0, 30);
-                    } else {
-                        // Very faint, breathing purple/blue glow in the background
-                        float bgIntensity = 3.0f + 5.0f * (pulseScale - 0.85f);
-                        leds[idx] = CRGB(bgIntensity * 0.4f, 0, bgIntensity * 0.8f);
-                    }
-                }
-            }
-            break;
         }
-
-        case 2: // Solid Red (Power check)
-            fill_solid(leds, NUM_LEDS, CRGB::Red);
-            break;
-            
-        case 3: // Solid Green (Power check)
-            fill_solid(leds, NUM_LEDS, CRGB::Green);
-            break;
-            
-        case 4: // Solid Blue (Power check)
-            fill_solid(leds, NUM_LEDS, CRGB::Blue);
-            break;
-            
-        case 5: // Solid White (Low Brightness check)
-            fill_solid(leds, NUM_LEDS, CRGB::White);
-            break;
-            
-        case 6: // Serpentine Index Chase (Wiring check)
-            if (now - lastChaseStep >= 40) {
-                lastChaseStep = now;
-                leds[chaseIndex] = CRGB::Black;
-                chaseIndex = (chaseIndex + 1) % NUM_LEDS;
-                leds[chaseIndex] = CRGB::White;
-                leds[0] = CRGB::Red; // Keep LED 0 red as reference
-            }
-            break;
     }
     
     FastLED.show();

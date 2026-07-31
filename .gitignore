@@ -1,6 +1,7 @@
 # PlatformIO local build and cache directories
 .pio
 .clangd
+.cache
 
 # VS Code config directories (except template files if any)
 .vscode/.browse.c_cpp_properties.schema.json

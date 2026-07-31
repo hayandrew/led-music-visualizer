@@ -2,7 +2,6 @@
 #define AUDIO_PROCESSOR_H
 
 #include <Arduino.h>
-#include "config.h"
 
 namespace AudioProcessor {
     // Initialize the I2S interface and start the background sampling task

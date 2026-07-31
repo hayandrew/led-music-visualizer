@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <ArduinoOTA.h>
-#include "config.h"
+#include "project_config.h"
 #include "led_diagnostics.h"
 #include "audio_processor.h"
 

@@ -1,4 +1,5 @@
 #include "audio_processor.h"
+#include "project_config.h"
 #include "driver/i2s.h"
 
 static float audioBuffer[I2S_BUFFER_SIZE];
