@@ -25,9 +25,9 @@ void init() {
     // Initialize FastLED with GRB color order on LED_PIN
     FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
     
-    // Set a safe global brightness level (45 out of 255, approx 17% brightness)
+    // Set a safe global brightness level (26 out of 255, approx 10% brightness)
     // to prevent drawing excessive current from a USB power source
-    FastLED.setBrightness(45);
+    FastLED.setBrightness(26);
     FastLED.clear();
     FastLED.show();
     
@@ -406,6 +406,167 @@ void drawNoise() {
     }
 }
 
+// 9. Rainbow Wave (Swirling rainbow whose speed is driven by audio intensity)
+void drawRainbowWave() {
+    static float hueOffset = 0;
+    float env = AudioProcessor::getVolumeEnvelope();
+    
+    // Modulate wave rotation speed based on sound envelope
+    float speed = 0.3f + (env / 3000.0f) * 2.0f;
+    hueOffset += speed;
+    if (hueOffset >= 256.0f) hueOffset -= 256.0f;
+
+    // Saturation and brightness breathing based on volume
+    uint8_t sat = 255 - constrain((int)(env / 100.0f), 0, 40);
+    uint8_t minBri = 80;
+    uint8_t maxBri = 255;
+    uint8_t bri = minBri + constrain((int)(env / 25.0f), 0, maxBri - minBri);
+
+    for (uint8_t x = 0; x < MATRIX_WIDTH; x++) {
+        for (uint8_t y = 0; y < MATRIX_HEIGHT; y++) {
+            // Diagonal swirling wave
+            uint8_t hue = (uint8_t)(x * 8 + y * 12 + hueOffset);
+            leds[getLEDIndex(x, y)] = CHSV(hue, sat, bri);
+        }
+    }
+}
+
+// 10. Fire Portal (Audio-reactive flame simulation rising from the bottom)
+void drawFirePortal() {
+    static uint8_t heat[MATRIX_WIDTH][MATRIX_HEIGHT] = {{0}};
+    float env = AudioProcessor::getVolumeEnvelope();
+    
+    // 1. Cool down: every cell cools down randomly
+    for (int x = 0; x < MATRIX_WIDTH; x++) {
+        for (int y = 0; y < MATRIX_HEIGHT; y++) {
+            uint8_t cooldown = random(3, 8);
+            if (cooldown >= heat[x][y]) {
+                heat[x][y] = 0;
+            } else {
+                heat[x][y] -= cooldown;
+            }
+        }
+    }
+
+    // 2. Drift up: heat flows upward and diffuses
+    for (int y = MATRIX_HEIGHT - 1; y >= 2; y--) {
+        for (int x = 0; x < MATRIX_WIDTH; x++) {
+            int xLeft = (x > 0) ? x - 1 : x;
+            int xRight = (x < MATRIX_WIDTH - 1) ? x + 1 : x;
+            heat[x][y] = (heat[x][y - 1] + heat[xLeft][y - 1] + heat[xRight][y - 1] + heat[x][y - 2]) / 4;
+        }
+    }
+    for (int x = 0; x < MATRIX_WIDTH; x++) {
+        heat[x][1] = (heat[x][0] + ((x > 0) ? heat[x - 1][0] : heat[x][0]) + ((x < MATRIX_WIDTH - 1) ? heat[x + 1][0] : heat[x][0])) / 3;
+    }
+
+    // 3. Ignite: Feed bottom row (y=0) with heat based on sound level
+    int baseHeat = 80 + constrain((int)(env / 15.0f), 0, 175);
+    for (int x = 0; x < MATRIX_WIDTH; x++) {
+        if (random8() < 128) {
+            heat[x][0] = qadd8(heat[x][0], random(baseHeat / 2, baseHeat));
+        }
+    }
+
+    // 4. Map heat values to fire colors (Black -> Red -> Yellow -> White)
+    for (uint8_t x = 0; x < MATRIX_WIDTH; x++) {
+        for (uint8_t y = 0; y < MATRIX_HEIGHT; y++) {
+            uint8_t h = heat[x][y];
+            CRGB color;
+            if (h < 85) {
+                color = CRGB(h * 3, 0, 0);
+            } else if (h < 170) {
+                color = CRGB(255, (h - 85) * 3, 0);
+            } else {
+                color = CRGB(255, 255, (h - 170) * 3);
+            }
+            leds[getLEDIndex(x, y)] = color;
+        }
+    }
+}
+
+// 11. Digital Rain (Neon green matrix rain whose speed scales with audio volume)
+void drawDigitalRain() {
+    static float rainY[MATRIX_WIDTH] = {0};
+    static float rainSpeed[MATRIX_WIDTH] = {0};
+    static uint8_t initDone = 0;
+    
+    if (!initDone) {
+        for (int i = 0; i < MATRIX_WIDTH; i++) {
+            rainY[i] = random(0, MATRIX_HEIGHT);
+            rainSpeed[i] = 0.08f + random(4, 12) / 100.0f;
+        }
+        initDone = 1;
+    }
+    
+    // Fade display down slowly to create falling trails
+    for (int i = 0; i < NUM_LEDS; i++) {
+        leds[i].fadeToBlackBy(45);
+    }
+    
+    float env = AudioProcessor::getVolumeEnvelope();
+    // Speed multiplier driven by audio envelope
+    float speedMult = 1.0f + (env / 2500.0f) * 1.8f;
+    
+    for (int x = 0; x < MATRIX_WIDTH; x++) {
+        rainY[x] -= rainSpeed[x] * speedMult;
+        if (rainY[x] < 0) {
+            rainY[x] = MATRIX_HEIGHT - 1;
+            rainSpeed[x] = 0.06f + random(3, 10) / 100.0f;
+        }
+        
+        int headY = (int)rainY[x];
+        if (headY >= 0 && headY < MATRIX_HEIGHT) {
+            // Neon cyan-green palette
+            uint8_t hue = 96 + random(0, 32);
+            leds[getLEDIndex(x, headY)] = CHSV(hue, 255, 255);
+        }
+    }
+}
+
+// 12. Pulsing Tunnel (Concentric color rings expanding from center, pulsing to the beat)
+void drawPulsingTunnel() {
+    // Fade screen slowly to create beautiful trails
+    for (int i = 0; i < NUM_LEDS; i++) {
+        leds[i].fadeToBlackBy(50);
+    }
+
+    static float timeOffset = 0;
+    float env = AudioProcessor::getVolumeEnvelope();
+    
+    // Speed up ring expansion with audio volume
+    float speed = 0.4f + (env / 2500.0f) * 2.0f;
+    timeOffset += speed;
+    
+    float cx = (MATRIX_WIDTH - 1) / 2.0f;
+    float cy = (MATRIX_HEIGHT - 1) / 2.0f;
+    
+    static uint8_t baseHue = 0;
+    baseHue += 1;
+    
+    for (uint8_t x = 0; x < MATRIX_WIDTH; x++) {
+        for (uint8_t y = 0; y < MATRIX_HEIGHT; y++) {
+            float dx = x - cx;
+            float dy = y - cy;
+            float dist = sqrt(dx * dx + dy * dy);
+            
+            // Wave phase expanding outward
+            uint8_t phase = (uint8_t)(dist * 35.0f - timeOffset);
+            uint8_t wave = sin8(phase);
+            
+            if (wave > 200) {
+                uint8_t bri = map(wave, 200, 255, 0, 255);
+                // Dynamic brightness boost based on volume
+                uint8_t volBoost = constrain((int)(env / 20.0f), 0, 150);
+                uint8_t finalBri = qadd8(bri, volBoost);
+                
+                uint8_t hue = baseHue + (uint8_t)(dist * 15);
+                leds[getLEDIndex(x, y)] += CHSV(hue, 240, finalBri);
+            }
+        }
+    }
+}
+
 void update() {
     // Choose rendering function based on active mode
     switch (currentMode) {
@@ -429,6 +590,18 @@ void update() {
             break;
         case MODE_NOISE:
             drawNoise();
+            break;
+        case MODE_RAINBOW_WAVE:
+            drawRainbowWave();
+            break;
+        case MODE_FIRE_PORTAL:
+            drawFirePortal();
+            break;
+        case MODE_DIGITAL_RAIN:
+            drawDigitalRain();
+            break;
+        case MODE_PULSING_TUNNEL:
+            drawPulsingTunnel();
             break;
         default:
             FastLED.clear();
@@ -463,6 +636,10 @@ const char* getModeName(VisualizerMode mode) {
         case MODE_BASS_PULSE:         return "Bass Pulse";
         case MODE_SOUND_RIPPLES:      return "Sound Ripples";
         case MODE_NOISE:              return "Ambient Noise";
+        case MODE_RAINBOW_WAVE:       return "Rainbow Wave";
+        case MODE_FIRE_PORTAL:        return "Fire Portal";
+        case MODE_DIGITAL_RAIN:       return "Digital Rain";
+        case MODE_PULSING_TUNNEL:     return "Pulsing Tunnel";
         default:                      return "Unknown";
     }
 }

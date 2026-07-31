@@ -11,6 +11,10 @@ enum VisualizerMode {
     MODE_BASS_PULSE,
     MODE_SOUND_RIPPLES,
     MODE_NOISE,
+    MODE_RAINBOW_WAVE,
+    MODE_FIRE_PORTAL,
+    MODE_DIGITAL_RAIN,
+    MODE_PULSING_TUNNEL,
     MODE_COUNT // Keeps track of total modes
 };
 

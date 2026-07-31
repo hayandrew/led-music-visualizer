@@ -35,13 +35,17 @@ namespace DisplayManager {
     const char* getShortModeName(VisualizerMode mode) {
         switch (mode) {
             case MODE_DIAGNOSTIC_HEART:   return "Heartbeat";
-            case MODE_SPECTRUM_LINEAR:     return "Linear Spec";
+            case MODE_SPECTRUM_LINEAR:     return "Linear";
             case MODE_SPECTRUM_SYMMETRIC:   return "Sym Spec";
             case MODE_VU_METER:           return "VU Meter";
-            case MODE_BASS_PULSE:         return "Bass Pulse";
+            case MODE_BASS_PULSE:         return "BassPulse";
             case MODE_SOUND_RIPPLES:       return "Ripples";
             case MODE_NOISE:               return "Noise";
-            default:                       return "Visualizer";
+            case MODE_RAINBOW_WAVE:       return "Rainbow";
+            case MODE_FIRE_PORTAL:        return "Fire Portal";
+            case MODE_DIGITAL_RAIN:       return "Digi Rain";
+            case MODE_PULSING_TUNNEL:     return "Tunnel";
+            default:                       return "Visual";
         }
     }
 
@@ -74,22 +78,19 @@ namespace DisplayManager {
         // 2. Clear buffers and start drawing
         display.clearDisplay();
 
-        // Header Title
-        display.setTextColor(SSD1306_WHITE);
-        drawCenteredText("ANDY vs MACHINE", 0, 1);
-        display.drawFastHLine(0, 9, 128, SSD1306_WHITE);
-
         // Fetch active settings and controls state
         int cursor = ControlsManager::getMenuCursor();
         bool editing = ControlsManager::isEditing();
 
-        // Render Focused Category Option Label
+        // Header Title (Current Menu Item)
+        display.setTextColor(SSD1306_WHITE);
         switch (cursor) {
-            case 0: drawCenteredText("1/4: Visualizer Mode", 14, 1); break;
-            case 1: drawCenteredText("2/4: LED Brightness", 14, 1); break;
-            case 2: drawCenteredText("3/4: Microphone Gain", 14, 1); break;
-            case 3: drawCenteredText("4/4: Auto-Cycling", 14, 1); break;
+            case 0: drawCenteredText("Visualizer Mode", 0, 1); break;
+            case 1: drawCenteredText("LED Brightness", 0, 1); break;
+            case 2: drawCenteredText("Microphone Gain", 0, 1); break;
+            case 3: drawCenteredText("Auto-Cycling", 0, 1); break;
         }
+        display.drawFastHLine(0, 9, 128, SSD1306_WHITE);
 
         // Render Focused Parameter Value or Progress Bar
         if (cursor == 0) {
