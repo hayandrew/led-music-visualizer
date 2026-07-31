@@ -45,6 +45,7 @@ namespace DisplayManager {
             case MODE_FIRE_PORTAL:        return "Fire Portal";
             case MODE_DIGITAL_RAIN:       return "Digi Rain";
             case MODE_PULSING_TUNNEL:     return "Tunnel";
+            case MODE_MARIO_RUN:          return "Mario Run";
             default:                       return "Visual";
         }
     }
@@ -177,6 +178,54 @@ namespace DisplayManager {
         }
 
         // Render the buffer to the physical screen
+        display.display();
+    }
+
+    void drawOtaProgress(unsigned int progress, unsigned int total) {
+        static int lastPercent = -1;
+        int percent = (total > 0) ? (progress * 100 / total) : 0;
+        if (percent == lastPercent && progress > 0) {
+            return;
+        }
+
+        display.clearDisplay();
+        display.setTextColor(SSD1306_WHITE);
+
+        // Header Title
+        drawCenteredText("OTA UPDATE", 0, 1);
+        display.drawFastHLine(0, 9, 128, SSD1306_WHITE);
+
+        // Main info text
+        drawCenteredText("Downloading...", 15, 1);
+
+        // Draw progress bar border (100px wide, centered: x=14 to 114)
+        display.drawRect(14, 28, 100, 10, SSD1306_WHITE);
+        // Draw progress bar fill
+        int fillWidth = percent;
+        display.fillRect(14, 28, fillWidth, 10, SSD1306_WHITE);
+
+        // Draw percentage text
+        char buf[16];
+        sprintf(buf, "%d%% completed", percent);
+        drawCenteredText(buf, 44, 1);
+
+        // Refresh screen
+        display.display();
+
+        if (percent >= 100) {
+            lastPercent = -1;
+        } else {
+            lastPercent = percent;
+        }
+    }
+
+    void drawOtaError(const char* errorMsg) {
+        display.clearDisplay();
+        display.setTextColor(SSD1306_WHITE);
+        drawCenteredText("OTA ERROR", 0, 1);
+        display.drawFastHLine(0, 9, 128, SSD1306_WHITE);
+        drawCenteredText(errorMsg, 24, 1);
+        drawCenteredText("Rebooting...", 44, 1);
         display.display();
     }
 }

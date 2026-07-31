@@ -62,23 +62,28 @@ void setup() {
       type = "filesystem";
     }
     Serial.println("[OTA] Start updating " + type);
+    DisplayManager::drawOtaProgress(0, 100);
   });
 
   ArduinoOTA.onEnd([]() {
     Serial.println("\n[OTA] End of update. Rebooting...");
+    DisplayManager::drawOtaProgress(100, 100);
   });
 
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
     Serial.printf("[OTA] Progress: %u%%\r", (progress / (total / 100)));
+    DisplayManager::drawOtaProgress(progress, total);
   });
 
   ArduinoOTA.onError([](ota_error_t error) {
     Serial.printf("[OTA] Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-    else if (error == OTA_END_ERROR) Serial.println("End Failed");
+    const char* msg = "Unknown Error";
+    if (error == OTA_AUTH_ERROR) { Serial.println("Auth Failed"); msg = "Auth Failed"; }
+    else if (error == OTA_BEGIN_ERROR) { Serial.println("Begin Failed"); msg = "Begin Failed"; }
+    else if (error == OTA_CONNECT_ERROR) { Serial.println("Connect Failed"); msg = "Connect Failed"; }
+    else if (error == OTA_RECEIVE_ERROR) { Serial.println("Receive Failed"); msg = "Receive Failed"; }
+    else if (error == OTA_END_ERROR) { Serial.println("End Failed"); msg = "End Failed"; }
+    DisplayManager::drawOtaError(msg);
   });
 
   ArduinoOTA.begin();

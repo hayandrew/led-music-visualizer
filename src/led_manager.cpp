@@ -5,7 +5,7 @@
 
 static CRGB leds[NUM_LEDS];
 static VisualizerMode currentMode = MODE_SPECTRUM_SYMMETRIC; // Start with mirrored spectrum
-static bool autoCycleEnabled = true;
+static bool autoCycleEnabled = false;
 
 // Serpentine Index Mapping
 uint16_t getLEDIndex(uint8_t x, uint8_t y) {
@@ -434,12 +434,29 @@ void drawRainbowWave() {
 // 10. Fire Portal (Audio-reactive flame simulation rising from the bottom)
 void drawFirePortal() {
     static uint8_t heat[MATRIX_WIDTH][MATRIX_HEIGHT] = {{0}};
+    
+    struct Spark {
+        float x;
+        float y;
+        float vx;
+        float vy;
+        uint8_t life;
+        bool active;
+    };
+    static Spark sparks[10] = {0};
+
     float env = AudioProcessor::getVolumeEnvelope();
     
-    // 1. Cool down: every cell cools down randomly
+    // 1. Dynamic cooling rate based on volume
+    // Quiet -> fast cooling (speeds up decay). Loud -> slow cooling (lets flames rise).
+    int coolMin = map(env, 0, 3500, 8, 3);
+    coolMin = constrain(coolMin, 3, 10);
+    int coolMax = map(env, 0, 3500, 16, 6);
+    coolMax = constrain(coolMax, 6, 20);
+
     for (int x = 0; x < MATRIX_WIDTH; x++) {
         for (int y = 0; y < MATRIX_HEIGHT; y++) {
-            uint8_t cooldown = random(3, 8);
+            uint8_t cooldown = random(coolMin, coolMax);
             if (cooldown >= heat[x][y]) {
                 heat[x][y] = 0;
             } else {
@@ -460,27 +477,81 @@ void drawFirePortal() {
         heat[x][1] = (heat[x][0] + ((x > 0) ? heat[x - 1][0] : heat[x][0]) + ((x < MATRIX_WIDTH - 1) ? heat[x + 1][0] : heat[x][0])) / 3;
     }
 
-    // 3. Ignite: Feed bottom row (y=0) with heat based on sound level
-    int baseHeat = 80 + constrain((int)(env / 15.0f), 0, 175);
+    // 3. Dynamic Height Cap based on volume (flames grow/shrink physically)
+    int maxHeight = map(env, 0, 3000, 5, MATRIX_HEIGHT);
+    maxHeight = constrain(maxHeight, 5, MATRIX_HEIGHT);
+    for (int y = maxHeight; y < MATRIX_HEIGHT; y++) {
+        for (int x = 0; x < MATRIX_WIDTH; x++) {
+            heat[x][y] = (heat[x][y] * 1) / 2; // Fast decay above height cap
+        }
+    }
+
+    // 4. Ignite: Feed bottom row (y=0) with heat based on sound level
+    int baseHeat = 20 + constrain((int)(env / 12.0f), 0, 235);
     for (int x = 0; x < MATRIX_WIDTH; x++) {
-        if (random8() < 128) {
+        if (random8() < 120) {
             heat[x][0] = qadd8(heat[x][0], random(baseHeat / 2, baseHeat));
         }
     }
 
-    // 4. Map heat values to fire colors (Black -> Red -> Yellow -> White)
+    // 5. Render heat to fire colors
     for (uint8_t x = 0; x < MATRIX_WIDTH; x++) {
         for (uint8_t y = 0; y < MATRIX_HEIGHT; y++) {
             uint8_t h = heat[x][y];
             CRGB color;
             if (h < 85) {
-                color = CRGB(h * 3, 0, 0);
+                color = CRGB(h * 3, 0, 0); // Red
             } else if (h < 170) {
-                color = CRGB(255, (h - 85) * 3, 0);
+                color = CRGB(255, (h - 85) * 3, 0); // Yellow
             } else {
-                color = CRGB(255, 255, (h - 170) * 3);
+                color = CRGB(255, 255, (h - 170) * 3); // White hot
             }
             leds[getLEDIndex(x, y)] = color;
+        }
+    }
+
+    // 6. Spawn and Render Crackling Sparks/Embers
+    // Higher volume increases spark chance
+    int spawnChance = 15 + constrain((int)(env / 100.0f), 0, 60);
+    if (random8() < spawnChance) {
+        for (int i = 0; i < 10; i++) {
+            if (!sparks[i].active) {
+                sparks[i].active = true;
+                sparks[i].x = random(0, MATRIX_WIDTH);
+                sparks[i].y = random(0, 3); // Start near bottom
+                sparks[i].vx = (random(-5, 6) / 10.0f); // Horizontal drift
+                sparks[i].vy = 0.6f + (random(4, 12) / 10.0f); // Drift up speed
+                sparks[i].life = random(120, 255);
+                break;
+            }
+        }
+    }
+
+    // Update and draw active sparks
+    for (int i = 0; i < 10; i++) {
+        if (sparks[i].active) {
+            sparks[i].x += sparks[i].vx;
+            sparks[i].y += sparks[i].vy;
+            if (sparks[i].life > 15) {
+                sparks[i].life -= 12; // Decay
+            } else {
+                sparks[i].life = 0;
+            }
+
+            int sx = (int)sparks[i].x;
+            int sy = (int)sparks[i].y;
+
+            if (sy >= MATRIX_HEIGHT || sx < 0 || sx >= MATRIX_WIDTH || sparks[i].life == 0) {
+                sparks[i].active = false;
+            } else {
+                // Draw ember overlay: orange-white hot
+                uint16_t idx = getLEDIndex(sx, sy);
+                leds[idx] = CRGB(
+                    qadd8(leds[idx].r, sparks[i].life),
+                    qadd8(leds[idx].g, (sparks[i].life * 3) / 4),
+                    qadd8(leds[idx].b, sparks[i].life / 2)
+                );
+            }
         }
     }
 }
@@ -526,16 +597,11 @@ void drawDigitalRain() {
 
 // 12. Pulsing Tunnel (Concentric color rings expanding from center, pulsing to the beat)
 void drawPulsingTunnel() {
-    // Fade screen slowly to create beautiful trails
-    for (int i = 0; i < NUM_LEDS; i++) {
-        leds[i].fadeToBlackBy(50);
-    }
-
     static float timeOffset = 0;
     float env = AudioProcessor::getVolumeEnvelope();
     
     // Speed up ring expansion with audio volume
-    float speed = 0.4f + (env / 2500.0f) * 2.0f;
+    float speed = 1.2f + (env / 2000.0f) * 4.5f;
     timeOffset += speed;
     
     float cx = (MATRIX_WIDTH - 1) / 2.0f;
@@ -550,19 +616,156 @@ void drawPulsingTunnel() {
             float dy = y - cy;
             float dist = sqrt(dx * dx + dy * dy);
             
-            // Wave phase expanding outward
-            uint8_t phase = (uint8_t)(dist * 35.0f - timeOffset);
+            // Higher spatial frequency for multiple concurrent rings
+            uint8_t phase = (uint8_t)(dist * 65.0f - timeOffset);
             uint8_t wave = sin8(phase);
             
-            if (wave > 200) {
-                uint8_t bri = map(wave, 200, 255, 0, 255);
-                // Dynamic brightness boost based on volume
-                uint8_t volBoost = constrain((int)(env / 20.0f), 0, 150);
-                uint8_t finalBri = qadd8(bri, volBoost);
-                
-                uint8_t hue = baseHue + (uint8_t)(dist * 15);
-                leds[getLEDIndex(x, y)] += CHSV(hue, 240, finalBri);
+            // Shape the wave to get distinct, crisp rings with black gaps
+            uint8_t bri = 0;
+            if (wave > 100) {
+                bri = map(wave, 100, 255, 0, 255);
             }
+            
+            // Entire tunnel pulses in brightness with the beat
+            uint8_t volBoost = constrain((int)(env / 20.0f), 0, 130);
+            uint8_t finalBri = qadd8(bri, volBoost);
+            
+            // Spectrum of colors shifting along the radius
+            uint8_t hue = baseHue + (uint8_t)(dist * 16);
+            leds[getLEDIndex(x, y)] = CHSV(hue, 240, finalBri);
+        }
+    }
+}
+
+// 13. Super Mario Run (Mario sprite running in place, speed driven by audio)
+// 0: Black/Transparent, 1: Red (Cap/Overalls), 2: Skin (Orange/Face), 3: Olive Green (Shirt/Hair/Shoes)
+static const uint8_t mario_frames[4][16][12] = {
+    // Frame 0: Standing
+    {
+        {0,0,0,1,1,1,1,1,0,0,0,0},
+        {0,0,1,1,1,1,1,1,1,1,1,0},
+        {0,0,3,3,3,2,2,3,2,0,0,0},
+        {0,3,2,3,2,2,2,3,2,2,2,0},
+        {0,3,2,3,3,2,2,2,3,2,2,2},
+        {0,3,3,2,2,2,2,3,3,3,3,0},
+        {0,0,0,2,2,2,2,2,2,2,0,0},
+        {0,0,1,1,3,1,1,1,0,0,0,0},
+        {0,1,1,1,3,1,1,3,1,1,1,0},
+        {1,1,1,1,3,3,3,3,1,1,1,1},
+        {2,2,1,3,2,3,3,2,3,1,2,2},
+        {2,2,2,3,3,3,3,3,3,2,2,2},
+        {2,2,3,3,3,3,3,3,3,3,2,2},
+        {0,0,3,3,3,0,0,3,3,3,0,0},
+        {0,3,3,3,0,0,0,0,3,3,3,0},
+        {3,3,3,3,0,0,0,0,3,3,3,3}
+    },
+    // Frame 1: Run 1
+    {
+        {0,0,0,0,1,1,1,1,1,0,0,0},
+        {0,0,0,1,1,1,1,1,1,1,1,1},
+        {0,0,0,3,3,3,2,2,3,2,0,0},
+        {0,0,3,2,3,2,2,2,3,2,2,2},
+        {0,0,3,2,3,3,2,2,2,3,2,2},
+        {0,0,3,3,2,2,2,2,3,3,3,3},
+        {0,0,0,0,2,2,2,2,2,2,2,0},
+        {0,0,0,3,3,1,3,3,3,0,0,0},
+        {0,0,3,3,3,1,3,3,1,3,0,0},
+        {0,3,3,3,3,1,1,1,1,3,3,0},
+        {2,2,3,3,1,2,1,1,2,1,3,2},
+        {2,2,2,1,1,1,1,1,1,1,2,2},
+        {0,2,1,1,1,1,1,1,1,1,2,0},
+        {0,0,1,1,1,0,0,1,1,1,0,0},
+        {0,3,3,3,0,0,0,0,3,3,3,0},
+        {3,3,3,3,0,0,0,0,3,3,3,3}
+    },
+    // Frame 2: Run 2
+    {
+        {0,0,0,1,1,1,1,1,0,0,0,0},
+        {0,0,1,1,1,1,1,1,1,1,1,0},
+        {0,0,3,3,3,2,2,3,2,0,0,0},
+        {0,3,2,3,2,2,2,3,2,2,2,0},
+        {0,3,2,3,3,2,2,2,3,2,2,2},
+        {0,3,3,2,2,2,2,3,3,3,3,0},
+        {0,0,0,2,2,2,2,2,2,2,0,0},
+        {0,0,1,1,3,1,1,1,3,0,0,0},
+        {0,1,1,1,3,1,1,3,1,1,0,0},
+        {1,1,1,1,3,3,3,3,1,1,1,0},
+        {2,2,2,3,2,1,1,2,3,1,1,2},
+        {0,2,2,1,1,1,1,1,1,1,2,2},
+        {0,0,1,1,1,1,1,1,1,1,2,0},
+        {0,1,1,1,0,0,0,1,1,1,0,0},
+        {0,3,3,0,0,0,0,0,3,3,0,0},
+        {3,3,3,0,0,0,0,0,3,3,3,0}
+    },
+    // Frame 3: Run 3
+    {
+        {0,0,0,0,1,1,1,1,1,0,0,0},
+        {0,0,0,1,1,1,1,1,1,1,1,1},
+        {0,0,0,3,3,3,2,2,3,2,0,0},
+        {0,0,3,2,3,2,2,2,3,2,2,2},
+        {0,0,3,2,3,3,2,2,2,3,2,2},
+        {0,0,3,3,2,2,2,2,3,3,3,3},
+        {0,0,0,0,2,2,2,2,2,2,2,0},
+        {0,0,1,1,3,1,1,1,3,0,0,0},
+        {0,1,1,1,3,1,1,3,1,1,0,0},
+        {1,1,1,1,3,3,3,3,1,1,1,0},
+        {2,2,2,3,2,1,1,2,3,1,1,2},
+        {0,2,2,1,1,1,1,1,1,1,2,2},
+        {0,0,1,1,1,1,1,1,1,1,2,0},
+        {0,1,1,1,0,0,0,1,1,1,0,0},
+        {0,3,3,0,0,0,0,0,3,3,0,0},
+        {3,3,3,0,0,0,0,0,3,3,3,0}
+    }
+};
+
+void drawMarioRun() {
+    // Clear screen completely
+    for (int i = 0; i < NUM_LEDS; i++) {
+        leds[i] = CRGB::Black;
+    }
+
+    float env = AudioProcessor::getVolumeEnvelope();
+
+    // Determine running frame loop based on audio envelope
+    static float animFrame = 1.0f;
+    int currentFrame = 0; // Standing by default
+
+    if (env > 400.0f) { // Sound threshold to start running
+        // Running speed matches volume level
+        float speed = 0.08f + (env / 3000.0f) * 0.35f;
+        animFrame += speed;
+        if (animFrame >= 4.0f) {
+            animFrame = 1.0f; // Loop run frames: 1, 2, 3
+        }
+        currentFrame = (int)animFrame;
+    } else {
+        animFrame = 1.0f;
+        currentFrame = 0; // Stand still
+    }
+
+    // Center the 12-wide, 16-high sprite on the 15x17 grid
+    int x_offset = (MATRIX_WIDTH - 12) / 2;  // (15 - 12) / 2 = 1
+    int y_offset = (MATRIX_HEIGHT - 16) / 2; // (17 - 16) / 2 = 0 (rows 0 to 15, leaving 16 blank)
+
+    for (int row = 0; row < 16; row++) {
+        int y_pixel = y_offset + (15 - row);
+        if (y_pixel < 0 || y_pixel >= MATRIX_HEIGHT) continue;
+
+        for (int col = 0; col < 12; col++) {
+            int x_pixel = x_offset + col;
+            if (x_pixel < 0 || x_pixel >= MATRIX_WIDTH) continue;
+
+            uint8_t pixelColorIdx = mario_frames[currentFrame][row][col];
+            if (pixelColorIdx == 0) continue; // Transparent
+
+            CRGB color;
+            switch (pixelColorIdx) {
+                case 1: color = CRGB(192, 28, 12); break;     // Red cap & overalls
+                case 2: color = CRGB(240, 156, 28); break;    // Skin orange
+                case 3: color = CRGB(80, 92, 12); break;      // Olive green shirt/hair/shoes
+                default: color = CRGB::Black; break;
+            }
+            leds[getLEDIndex(x_pixel, y_pixel)] = color;
         }
     }
 }
@@ -603,6 +806,9 @@ void update() {
         case MODE_PULSING_TUNNEL:
             drawPulsingTunnel();
             break;
+        case MODE_MARIO_RUN:
+            drawMarioRun();
+            break;
         default:
             FastLED.clear();
             break;
@@ -640,6 +846,7 @@ const char* getModeName(VisualizerMode mode) {
         case MODE_FIRE_PORTAL:        return "Fire Portal";
         case MODE_DIGITAL_RAIN:       return "Digital Rain";
         case MODE_PULSING_TUNNEL:     return "Pulsing Tunnel";
+        case MODE_MARIO_RUN:          return "Super Mario Run";
         default:                      return "Unknown";
     }
 }

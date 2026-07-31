@@ -15,6 +15,7 @@ enum VisualizerMode {
     MODE_FIRE_PORTAL,
     MODE_DIGITAL_RAIN,
     MODE_PULSING_TUNNEL,
+    MODE_MARIO_RUN,
     MODE_COUNT // Keeps track of total modes
 };
 
