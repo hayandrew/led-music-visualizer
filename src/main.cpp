@@ -4,6 +4,8 @@
 #include "project_config.h"
 #include "led_manager.h"
 #include "audio_processor.h"
+#include "controls_manager.h"
+#include "display_manager.h"
 
 void setup() {
   // Initialize Serial logging
@@ -60,6 +62,10 @@ void setup() {
   // Initialize LEDs via Manager
   LEDManager::init();
 
+  // Initialize physical controls and display menu
+  ControlsManager::init();
+  DisplayManager::init();
+
   Serial.println("=== Setup Complete. Entering loop ===\n");
 }
 
@@ -67,15 +73,27 @@ void loop() {
   // Handle OTA update check
   ArduinoOTA.handle();
 
+  // Update physical controls state and OLED display drawing
+  ControlsManager::update();
+  DisplayManager::update();
+
   // 1. Run FFT calculation if background I2S buffer is filled
   if (AudioProcessor::isNewBufferReady()) {
     AudioProcessor::runFFT();
     AudioProcessor::clearNewBufferFlag();
   }
 
-  // 2. Auto-cycle visualizer modes every 15 seconds
+  // 2. Auto-cycle visualizer modes every 15 seconds (if enabled)
   static unsigned long lastModeSwitch = millis();
-  if (millis() - lastModeSwitch >= 15000) {
+  static VisualizerMode lastActiveMode = LEDManager::getActiveMode();
+  VisualizerMode currentMode = LEDManager::getActiveMode();
+
+  if (currentMode != lastActiveMode) {
+    lastActiveMode = currentMode;
+    lastModeSwitch = millis();
+  }
+
+  if (LEDManager::getAutoCycle() && (millis() - lastModeSwitch >= 15000)) {
     lastModeSwitch = millis();
     LEDManager::nextMode();
   }

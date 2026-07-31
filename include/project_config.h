@@ -25,4 +25,11 @@
 #define AP_SSID "ESP32C3-Visualizer"
 #define AP_PASSWORD "12345678"
 
+// Physical Controls Pin Settings
+#define ENCODER_CLK_PIN 5
+#define ENCODER_DT_PIN  6
+#define ENCODER_SW_PIN  7
+#define OLED_SDA_PIN    0
+#define OLED_SCL_PIN    1
+
 #endif // CONFIG_H

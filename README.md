@@ -53,11 +53,11 @@ This project is divided into several iterative phases:
 * Added a dual VU meter reacting to peak amplitude and volume envelope.
 * Developed custom frequency-reactive effects including Bass Pulsing circles and Sound Ripple expansions.
 
-### **Phase 5: Web Configuration Portal** (✅ Complete)
-* Developed a responsive glassmorphic dark-mode web control panel served directly from the ESP32.
-* Configured a non-blocking WebSocket endpoint (`/ws`) on port 80 to sync settings and stream live audio statistics at 20 FPS.
-* Implemented control sliders for global brightness and microphone gain.
-* Added manual mode selector buttons and a toggle to enable/disable the 15-second visualizer auto-cycle.
+### **Phase 5: Physical Menu & Controls (SSD1306 & Rotary Encoder)** (✅ Complete)
+* Integrated a 128x64 SSD1306 OLED display over custom I2C pins (SDA: GPIO 0, SCL: GPIO 1) to render a local settings menu.
+* Connected a rotary encoder (CLK: GPIO 5, DT: GPIO 6, SW: GPIO 7) driven by a bounce-immune quadrature Gray-code state machine.
+* Implemented interactive menu states: Navigation Mode (moving selection cursor) and Edit Mode (adjusting visualizer modes, brightness levels, and gain scaling).
+* Programmed a real-time scrolling wave graph (oscilloscope) at the bottom of the screen mapping the active volume envelope.
 * *(⏳ Remaining)* Persist user configurations in non-volatile flash memory (Preferences/NVS).
 
 
