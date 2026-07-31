@@ -3,6 +3,7 @@
 #include <ArduinoOTA.h>
 #include "config.h"
 #include "led_diagnostics.h"
+#include "audio_processor.h"
 
 void setup() {
   // Initialize Serial logging
@@ -53,6 +54,9 @@ void setup() {
   ArduinoOTA.begin();
   Serial.println("[OTA] OTA Services Ready.");
 
+  // Initialize I2S Audio Processor
+  AudioProcessor::init();
+
   // Initialize LEDs
   LEDDiagnostics::init();
 
@@ -65,6 +69,15 @@ void loop() {
 
   // Run visualizer diagnostic cycles
   LEDDiagnostics::update();
+
+  // Print volume statistics to Serial Monitor every 100ms
+  static unsigned long lastPrint = 0;
+  if (millis() - lastPrint >= 100) {
+    lastPrint = millis();
+    Serial.printf("[Audio] Peak: %.2f | Envelope: %.2f\n", 
+                  AudioProcessor::getPeakAmplitude(), 
+                  AudioProcessor::getVolumeEnvelope());
+  }
 
   // Yield to keep the Wi-Fi/IP stack healthy
   delay(10);
