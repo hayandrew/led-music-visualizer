@@ -116,7 +116,7 @@ void loop() {
     AudioProcessor::clearNewBufferFlag();
   }
 
-  // 2. Auto-cycle visualizer modes every 15 seconds (if enabled)
+  // 2. Auto-cycle visualizer modes every 10 seconds (if enabled)
   static unsigned long lastModeSwitch = millis();
   static VisualizerMode lastActiveMode = LEDManager::getActiveMode();
   VisualizerMode currentMode = LEDManager::getActiveMode();
@@ -126,7 +126,7 @@ void loop() {
     lastModeSwitch = millis();
   }
 
-  if (LEDManager::getAutoCycle() && (millis() - lastModeSwitch >= 15000)) {
+  if (LEDManager::getAutoCycle() && (millis() - lastModeSwitch >= 10000)) {
     lastModeSwitch = millis();
     LEDManager::nextMode();
   }
