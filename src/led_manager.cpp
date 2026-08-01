@@ -58,29 +58,39 @@ void drawDiagnosticHeart() {
     }
 
     float env = AudioProcessor::getVolumeEnvelope();
-    float netEnv = env - 200.0f;
+    float netEnv = env - 50.0f;
     if (netEnv < 0.0f) netEnv = 0.0f;
 
-    float maxRef = 45000.0f;
+    // Significantly increased sensitivity (maxRef from 45000.0f down to 3200.0f)
+    float maxRef = 3200.0f;
     float normEnv = netEnv / maxRef;
     if (normEnv > 1.0f) normEnv = 1.0f;
     float soundFactor = sqrt(normEnv);
 
-    float baselineScale = 0.3f + 0.8f * soundFactor;
+    // Make the heart scale starting from 0.0 (fully invisible by default) up to 1.1
+    float baselineScale = 1.1f * soundFactor;
     float pulseScale = baselineScale * (0.85f + 0.15f * basePulse);
 
     float cx = (MATRIX_WIDTH - 1) / 2.0f;     
-    float cy = (MATRIX_HEIGHT - 1) / 2.0f + 1; 
+    // Centered vertically (compensated for heart shape center-of-mass)
+    float cy = (MATRIX_HEIGHT - 1) / 2.0f - 0.5f; 
 
     for (uint8_t x = 0; x < MATRIX_WIDTH; x++) {
         for (uint8_t y = 0; y < MATRIX_HEIGHT; y++) {
+            uint16_t idx = getLEDIndex(x, y);
+            
+            // If silent or heart scale is too small, render silent background (invisible heart)
+            if (pulseScale < 0.08f) {
+                leds[idx] = CRGB(1, 0, 2);
+                continue;
+            }
+
             float dx = (x - cx) / (4.5f * pulseScale);
             float dy = (y - cy) / (5.0f * pulseScale);
             
             float a = dx * dx + dy * dy - 1.0f;
             float heartVal = a * a * a - dx * dx * dy * dy * dy;
 
-            uint16_t idx = getLEDIndex(x, y);
             if (heartVal <= 0.0f) {
                 uint8_t redVal = 180 + 75 * soundFactor;
                 leds[idx] = CRGB(redVal, 0, 30);
@@ -386,20 +396,56 @@ void drawSoundRipples() {
     }
 }
 
-// 8. Idle Simplex Noise Mode
+// 8. Sound-Reactive Simplex Noise Mode
 void drawNoise() {
-    static uint32_t zDist = 0;
-    zDist += 3; // Shift speed of noise space
+    float env = AudioProcessor::getVolumeEnvelope();
+    
+    // Cycle through randomly chosen color schemes smoothly
+    static uint8_t currentBaseHue = random8(); // Initialize with a random color
+    static uint8_t targetBaseHue = random8();
+    static uint32_t lastTransitionTime = 0;
+    
+    uint32_t now = millis();
+    if (now - lastTransitionTime > 7000) { // Choose a new random color scheme every 7 seconds
+        targetBaseHue = random8();
+        lastTransitionTime = now;
+    }
+    
+    // Smoothly interpolate currentBaseHue towards targetBaseHue along the shortest path
+    uint8_t diff = targetBaseHue - currentBaseHue;
+    if (diff > 0) {
+        if (diff < 128) {
+            currentBaseHue++;
+        } else {
+            currentBaseHue--;
+        }
+    }
+    uint8_t baseHue = currentBaseHue;
+    
+    // Modulate space translation speed based on volume (More sensitive: env / 600.0f instead of 1000.0f)
+    float speed = 1.0f + (env / 600.0f) * 6.0f;
+    static float floatZ = 0;
+    floatZ += speed;
+    uint32_t zDist = (uint32_t)floatZ;
+    
+    // Brightness scaling and beat pulse (More sensitive: envelope ranges up to 1800.0f and divide by 10.0f)
+    float volumeFactor = 0.35f + (env / 1800.0f) * 0.65f;
+    volumeFactor = constrain(volumeFactor, 0.35f, 1.0f);
+    uint8_t beatPulse = constrain((int)(env / 10.0f), 0, 100);
+    
+    // Shift color spectrum based on volume (More sensitive: env / 15.0f instead of 25.0f)
+    uint8_t hueShift = constrain((int)(env / 15.0f), 0, 90);
     
     for (uint8_t x = 0; x < MATRIX_WIDTH; x++) {
         for (uint8_t y = 0; y < MATRIX_HEIGHT; y++) {
             // Generate Simplex noise: x-scale, y-scale, z-distance
             uint8_t noiseVal = inoise8(x * 35, y * 35, zDist);
             
-            // Map the noise value to a smooth, transitioning hue gradient (e.g. violet to turquoise)
-            uint8_t hue = 160 + (noiseVal / 4); // 160 (Blue/Indigo) to ~224 (Pink/Crimson)
-            uint8_t sat = 255 - (noiseVal / 8);  // Slight saturation breathing
-            uint8_t bri = dim8_raw(noiseVal);    // Use FastLED's smooth dimming
+            // Map the noise value to a transitioning hue around the cycling base color scheme
+            uint8_t hue = baseHue + (noiseVal / 4) + hueShift;
+            uint8_t sat = 255 - (noiseVal / 8);
+            uint8_t baseBri = dim8_raw(noiseVal);
+            uint8_t bri = qadd8((uint8_t)(baseBri * volumeFactor), beatPulse);
             
             leds[getLEDIndex(x, y)] = CHSV(hue, sat, bri);
         }
@@ -424,8 +470,9 @@ void drawRainbowWave() {
 
     for (uint8_t x = 0; x < MATRIX_WIDTH; x++) {
         for (uint8_t y = 0; y < MATRIX_HEIGHT; y++) {
-            // Diagonal swirling wave
-            uint8_t hue = (uint8_t)(x * 8 + y * 12 + hueOffset);
+            // Use 3D Simplex Noise (x, y, time) to warp the color gradient into organic swirling clouds
+            uint8_t warp = inoise8(x * 50, y * 50, (uint16_t)(hueOffset * 10));
+            uint8_t hue = (uint8_t)(x * 5 + y * 5 + warp + hueOffset);
             leds[getLEDIndex(x, y)] = CHSV(hue, sat, bri);
         }
     }
@@ -447,12 +494,11 @@ void drawFirePortal() {
 
     float env = AudioProcessor::getVolumeEnvelope();
     
-    // 1. Dynamic cooling rate based on volume
-    // Quiet -> fast cooling (speeds up decay). Loud -> slow cooling (lets flames rise).
-    int coolMin = map(env, 0, 3500, 8, 3);
-    coolMin = constrain(coolMin, 3, 10);
-    int coolMax = map(env, 0, 3500, 16, 6);
-    coolMax = constrain(coolMax, 6, 20);
+    // 1. Dynamic cooling rate based on volume (Less sensitive: mapped up to 8000 instead of 5000)
+    int coolMin = map(env, 0, 8000, 9, 4);
+    coolMin = constrain(coolMin, 4, 11);
+    int coolMax = map(env, 0, 8000, 18, 8);
+    coolMax = constrain(coolMax, 8, 22);
 
     for (int x = 0; x < MATRIX_WIDTH; x++) {
         for (int y = 0; y < MATRIX_HEIGHT; y++) {
@@ -465,31 +511,29 @@ void drawFirePortal() {
         }
     }
 
-    // 2. Drift up: heat flows upward and diffuses
+    // 2. Drift up: heat flows upward only within the same column (Isolated Channels)
     for (int y = MATRIX_HEIGHT - 1; y >= 2; y--) {
         for (int x = 0; x < MATRIX_WIDTH; x++) {
-            int xLeft = (x > 0) ? x - 1 : x;
-            int xRight = (x < MATRIX_WIDTH - 1) ? x + 1 : x;
-            heat[x][y] = (heat[x][y - 1] + heat[xLeft][y - 1] + heat[xRight][y - 1] + heat[x][y - 2]) / 4;
+            heat[x][y] = (heat[x][y - 1] * 3 + heat[x][y - 2]) / 4;
         }
     }
     for (int x = 0; x < MATRIX_WIDTH; x++) {
-        heat[x][1] = (heat[x][0] + ((x > 0) ? heat[x - 1][0] : heat[x][0]) + ((x < MATRIX_WIDTH - 1) ? heat[x + 1][0] : heat[x][0])) / 3;
+        heat[x][1] = (heat[x][0] * 2 + heat[x][1]) / 3;
     }
 
-    // 3. Dynamic Height Cap based on volume (flames grow/shrink physically)
-    int maxHeight = map(env, 0, 3000, 5, MATRIX_HEIGHT);
-    maxHeight = constrain(maxHeight, 5, MATRIX_HEIGHT);
+    // 3. Dynamic Height Cap based on volume (Less sensitive: mapped up to 8000 instead of 5000)
+    int maxHeight = map(env, 0, 8000, 3, MATRIX_HEIGHT);
+    maxHeight = constrain(maxHeight, 3, MATRIX_HEIGHT);
     for (int y = maxHeight; y < MATRIX_HEIGHT; y++) {
         for (int x = 0; x < MATRIX_WIDTH; x++) {
             heat[x][y] = (heat[x][y] * 1) / 2; // Fast decay above height cap
         }
     }
 
-    // 4. Ignite: Feed bottom row (y=0) with heat based on sound level
-    int baseHeat = 20 + constrain((int)(env / 12.0f), 0, 235);
+    // 4. Ignite: Feed bottom row based on sound level (Less sensitive: env/40.0f instead of env/22.0f)
+    int baseHeat = 15 + constrain((int)(env / 40.0f), 0, 150);
     for (int x = 0; x < MATRIX_WIDTH; x++) {
-        if (random8() < 120) {
+        if (random8() < 90) { // 35% chance per column instead of 47%
             heat[x][0] = qadd8(heat[x][0], random(baseHeat / 2, baseHeat));
         }
     }
@@ -510,17 +554,16 @@ void drawFirePortal() {
         }
     }
 
-    // 6. Spawn and Render Crackling Sparks/Embers
-    // Higher volume increases spark chance
-    int spawnChance = 15 + constrain((int)(env / 100.0f), 0, 60);
+    // 6. Spawn and Render Crackling Sparks/Embers (Less sensitive: env/250.0f instead of env/180.0f)
+    int spawnChance = 8 + constrain((int)(env / 250.0f), 0, 30);
     if (random8() < spawnChance) {
         for (int i = 0; i < 10; i++) {
             if (!sparks[i].active) {
                 sparks[i].active = true;
                 sparks[i].x = random(0, MATRIX_WIDTH);
-                sparks[i].y = random(0, 3); // Start near bottom
-                sparks[i].vx = (random(-5, 6) / 10.0f); // Horizontal drift
-                sparks[i].vy = 0.6f + (random(4, 12) / 10.0f); // Drift up speed
+                sparks[i].y = random(0, 3);
+                sparks[i].vx = (random(-3, 4) / 10.0f); // Less horizontal drift to stay inside channel
+                sparks[i].vy = 0.6f + (random(4, 12) / 10.0f);
                 sparks[i].life = random(120, 255);
                 break;
             }
@@ -533,7 +576,7 @@ void drawFirePortal() {
             sparks[i].x += sparks[i].vx;
             sparks[i].y += sparks[i].vy;
             if (sparks[i].life > 15) {
-                sparks[i].life -= 12; // Decay
+                sparks[i].life -= 12;
             } else {
                 sparks[i].life = 0;
             }
@@ -544,7 +587,6 @@ void drawFirePortal() {
             if (sy >= MATRIX_HEIGHT || sx < 0 || sx >= MATRIX_WIDTH || sparks[i].life == 0) {
                 sparks[i].active = false;
             } else {
-                // Draw ember overlay: orange-white hot
                 uint16_t idx = getLEDIndex(sx, sy);
                 leds[idx] = CRGB(
                     qadd8(leds[idx].r, sparks[i].life),
@@ -600,9 +642,12 @@ void drawPulsingTunnel() {
     static float timeOffset = 0;
     float env = AudioProcessor::getVolumeEnvelope();
     
-    // Speed up ring expansion with audio volume
-    float speed = 1.2f + (env / 2000.0f) * 4.5f;
+    // Speed up ring expansion with audio volume (faster passing bands)
+    float speed = 3.0f + (env / 1500.0f) * 7.0f;
     timeOffset += speed;
+    if (timeOffset >= 256.0f) {
+        timeOffset -= 256.0f;
+    }
     
     float cx = (MATRIX_WIDTH - 1) / 2.0f;
     float cy = (MATRIX_HEIGHT - 1) / 2.0f;
@@ -617,18 +662,19 @@ void drawPulsingTunnel() {
             float dist = sqrt(dx * dx + dy * dy);
             
             // Higher spatial frequency for multiple concurrent rings
-            uint8_t phase = (uint8_t)(dist * 65.0f - timeOffset);
+            // Cast to int first to ensure well-defined negative float casting behavior on ESP32
+            uint8_t phase = (uint8_t)(int)(dist * 65.0f - timeOffset);
             uint8_t wave = sin8(phase);
             
-            // Shape the wave to get distinct, crisp rings with black gaps
+            // Shape the wave to get distinct, crisp rings with black gaps (narrower threshold)
             uint8_t bri = 0;
-            if (wave > 100) {
-                bri = map(wave, 100, 255, 0, 255);
+            if (wave > 150) {
+                bri = map(wave, 150, 255, 0, 255);
             }
             
-            // Entire tunnel pulses in brightness with the beat
-            uint8_t volBoost = constrain((int)(env / 20.0f), 0, 130);
-            uint8_t finalBri = qadd8(bri, volBoost);
+            // Entire tunnel pulses in brightness with the beat (scaled by band brightness to preserve black bars)
+            uint8_t volBoost = constrain((int)(env / 15.0f), 0, 150);
+            uint8_t finalBri = qadd8(bri, (uint8_t)(volBoost * (bri / 255.0f)));
             
             // Spectrum of colors shifting along the radius
             uint8_t hue = baseHue + (uint8_t)(dist * 16);
@@ -795,7 +841,7 @@ void drawLavaLamp() {
     };
 
     static float timeOffset = 0;
-    timeOffset += 0.012f; // Smooth speed of floating blobs
+    timeOffset += 0.028f; // Smooth speed of floating blobs (increased from 0.012f)
 
     // Floating animation (sine/cosine waves)
     blobs[0].x = 3.5f + sin(timeOffset * 0.8f) * 1.5f;
@@ -812,7 +858,7 @@ void drawLavaLamp() {
 
     // Slow color shift
     static float hueOffset = 0;
-    hueOffset += 0.035f;
+    hueOffset += 0.06f; // Increased color shift speed from 0.035f
     uint8_t blobHue = (uint8_t)hueOffset;
     uint8_t bgHue = (uint8_t)(hueOffset + 96); // Contrasting liquid background
 
