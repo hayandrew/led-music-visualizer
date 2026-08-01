@@ -4,7 +4,7 @@
 #include <FastLED.h>
 
 static CRGB leds[NUM_LEDS];
-static VisualizerMode currentMode = MODE_SPECTRUM_SYMMETRIC; // Start with mirrored spectrum
+static VisualizerMode currentMode = MODE_SPECTRUM_LINEAR; // Start with linear spectrum
 static bool autoCycleEnabled = false;
 
 // Serpentine Index Mapping
@@ -343,7 +343,7 @@ void drawSoundRipples() {
     float delta = peak - lastPeak;
     lastPeak = peak;
 
-    if (delta > 8000.0f && env > 4000.0f) { // Transient sound trigger
+    if (delta > 1800.0f && env > 800.0f) { // Transient sound trigger
         // Find an inactive ripple slot
         for (int i = 0; i < 5; i++) {
             if (!ripples[i].active) {
@@ -632,7 +632,18 @@ void drawPulsingTunnel() {
             
             // Spectrum of colors shifting along the radius
             uint8_t hue = baseHue + (uint8_t)(dist * 16);
-            leds[getLEDIndex(x, y)] = CHSV(hue, 240, finalBri);
+            
+            // Always keep the center hole black
+            if (dist < 2.0f) {
+                leds[getLEDIndex(x, y)] = CRGB::Black;
+            } else if (dist < 3.0f) {
+                // Smooth transition at the edge of the black hole
+                float fadeFactor = (dist - 2.0f); // 0.0 to 1.0
+                uint8_t smoothBri = (uint8_t)(finalBri * fadeFactor);
+                leds[getLEDIndex(x, y)] = CHSV(hue, 240, smoothBri);
+            } else {
+                leds[getLEDIndex(x, y)] = CHSV(hue, 240, finalBri);
+            }
         }
     }
 }
@@ -770,6 +781,77 @@ void drawMarioRun() {
     }
 }
 
+// 14. Lava Lamp (Metaballs floating vertically, changing colors slowly, brightness reactive to audio)
+void drawLavaLamp() {
+    struct Blob {
+        float x, y;
+        float r;      // Radius
+    };
+    static Blob blobs[4] = {
+        {3.5f, 8.5f, 2.2f},
+        {11.5f, 8.5f, 2.8f},
+        {7.5f, 8.5f, 2.5f},
+        {5.5f, 8.5f, 1.8f}
+    };
+
+    static float timeOffset = 0;
+    timeOffset += 0.012f; // Smooth speed of floating blobs
+
+    // Floating animation (sine/cosine waves)
+    blobs[0].x = 3.5f + sin(timeOffset * 0.8f) * 1.5f;
+    blobs[0].y = 8.5f + cos(timeOffset * 1.1f) * 6.5f;
+
+    blobs[1].x = 11.5f + cos(timeOffset * 0.6f) * 2.0f;
+    blobs[1].y = 8.5f + sin(timeOffset * 0.9f) * 6.0f;
+
+    blobs[2].x = 7.5f + sin(timeOffset * 1.2f) * 2.5f;
+    blobs[2].y = 8.5f + sin(timeOffset * 0.7f) * 5.5f;
+
+    blobs[3].x = 5.5f + cos(timeOffset * 1.0f) * 1.8f;
+    blobs[3].y = 8.5f + cos(timeOffset * 1.3f) * 7.0f;
+
+    // Slow color shift
+    static float hueOffset = 0;
+    hueOffset += 0.035f;
+    uint8_t blobHue = (uint8_t)hueOffset;
+    uint8_t bgHue = (uint8_t)(hueOffset + 96); // Contrasting liquid background
+
+    float env = AudioProcessor::getVolumeEnvelope();
+    // Brighter/darker bubbles depending on sound volume
+    float soundMult = 0.15f + (env / 3500.0f) * 0.85f;
+    soundMult = constrain(soundMult, 0.15f, 1.0f);
+
+    for (uint8_t x = 0; x < MATRIX_WIDTH; x++) {
+        for (uint8_t y = 0; y < MATRIX_HEIGHT; y++) {
+            float sum = 0.0f;
+            for (int i = 0; i < 4; i++) {
+                float dx = x - blobs[i].x;
+                float dy = y - blobs[i].y;
+                float distSq = dx * dx + dy * dy;
+                if (distSq < 0.1f) distSq = 0.1f;
+                sum += (blobs[i].r * blobs[i].r) / distSq;
+            }
+
+            CRGB color;
+            if (sum > 1.0f) {
+                // Inside a blob: bright and highly sound-reactive
+                uint8_t bri = constrain((int)(200 * soundMult * fminf(sum, 2.5f) / 2.5f), 30, 255);
+                color = CHSV(blobHue, 240, bri);
+            } else if (sum > 0.6f) {
+                // Outer glow: smooth blend between background and blob
+                float factor = (sum - 0.6f) / 0.4f;
+                uint8_t h = lerp8by8(bgHue, blobHue, (uint8_t)(factor * 255));
+                uint8_t b = lerp8by8(12, (uint8_t)(200 * soundMult), (uint8_t)(factor * 255));
+                color = CHSV(h, 240, b);
+            } else {
+                // Deep background liquid
+                color = CHSV(bgHue, 255, 12);
+            }
+            leds[getLEDIndex(x, y)] = color;
+        }
+    }
+}
+
 void update() {
     // Choose rendering function based on active mode
     switch (currentMode) {
@@ -779,15 +861,15 @@ void update() {
         case MODE_SPECTRUM_LINEAR:
             drawSpectrumLinear();
             break;
-        case MODE_SPECTRUM_SYMMETRIC:
-            drawSpectrumSymmetric();
-            break;
-        case MODE_VU_METER:
-            drawVUMeter();
-            break;
-        case MODE_BASS_PULSE:
-            drawBassPulse();
-            break;
+        // case MODE_SPECTRUM_SYMMETRIC:
+        //     drawSpectrumSymmetric();
+        //     break;
+        // case MODE_VU_METER:
+        //     drawVUMeter();
+        //     break;
+        // case MODE_BASS_PULSE:
+        //     drawBassPulse();
+        //     break;
         case MODE_SOUND_RIPPLES:
             drawSoundRipples();
             break;
@@ -808,6 +890,9 @@ void update() {
             break;
         case MODE_MARIO_RUN:
             drawMarioRun();
+            break;
+        case MODE_LAVA_LAMP:
+            drawLavaLamp();
             break;
         default:
             FastLED.clear();
@@ -837,9 +922,9 @@ const char* getModeName(VisualizerMode mode) {
     switch (mode) {
         case MODE_DIAGNOSTIC_HEART:   return "Diagnostic Heart";
         case MODE_SPECTRUM_LINEAR:    return "Linear Spectrum";
-        case MODE_SPECTRUM_SYMMETRIC: return "Symmetric Spectrum";
-        case MODE_VU_METER:           return "Stereo VU Meter";
-        case MODE_BASS_PULSE:         return "Bass Pulse";
+        // case MODE_SPECTRUM_SYMMETRIC: return "Symmetric Spectrum";
+        // case MODE_VU_METER:           return "Stereo VU Meter";
+        // case MODE_BASS_PULSE:         return "Bass Pulse";
         case MODE_SOUND_RIPPLES:      return "Sound Ripples";
         case MODE_NOISE:              return "Ambient Noise";
         case MODE_RAINBOW_WAVE:       return "Rainbow Wave";
@@ -847,6 +932,7 @@ const char* getModeName(VisualizerMode mode) {
         case MODE_DIGITAL_RAIN:       return "Digital Rain";
         case MODE_PULSING_TUNNEL:     return "Pulsing Tunnel";
         case MODE_MARIO_RUN:          return "Super Mario Run";
+        case MODE_LAVA_LAMP:          return "Lava Lamp";
         default:                      return "Unknown";
     }
 }
