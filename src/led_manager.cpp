@@ -26,9 +26,9 @@ void init() {
     // Initialize FastLED with GRB color order on LED_PIN
     FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
     
-    // Set a safe global brightness level (26 out of 255, approx 10% brightness)
+    // Set a safe global brightness level (102 out of 255, approx 40% brightness)
     // to prevent drawing excessive current from a USB power source
-    FastLED.setBrightness(26);
+    FastLED.setBrightness(102);
     FastLED.clear();
     FastLED.show();
     

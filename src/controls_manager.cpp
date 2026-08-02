@@ -9,34 +9,53 @@ namespace ControlsManager {
     int menuCursor = 0;
     const int NUM_MENU_ITEMS = 4;
 
+    // State machine states
+    #define R_START 0x0
+    #define R_CW_FINAL 0x1
+    #define R_CW_BEGIN 0x2
+    #define R_CW_NEXT 0x3
+    #define R_CCW_BEGIN 0x4
+    #define R_CCW_FINAL 0x5
+    #define R_CCW_NEXT 0x6
+
+    #define DIR_CW 0x10
+    #define DIR_CCW 0x20
+
+    // Transition table for full-step encoder
+    static const uint8_t ttable[7][4] = {
+        // R_START
+        {R_START,    R_CW_BEGIN,  R_CCW_BEGIN, R_START},
+        // R_CW_FINAL
+        {R_CW_NEXT,  R_START,     R_CW_FINAL,  R_START | DIR_CW},
+        // R_CW_BEGIN
+        {R_CW_NEXT,  R_CW_BEGIN,  R_START,     R_START},
+        // R_CW_NEXT
+        {R_CW_NEXT,  R_CW_BEGIN,  R_CW_FINAL,  R_START},
+        // R_CCW_BEGIN
+        {R_CCW_NEXT, R_START,     R_CCW_BEGIN, R_START},
+        // R_CCW_FINAL
+        {R_CCW_NEXT, R_CCW_FINAL, R_START,     R_START | DIR_CCW},
+        // R_CCW_NEXT
+        {R_CCW_NEXT, R_CCW_FINAL, R_CCW_BEGIN, R_START},
+    };
+
     // Interrupt state variables
     volatile int rawEncoderDelta = 0;
-    volatile uint8_t prevState = 0;
+    volatile uint8_t encoderState = R_START;
     
     void IRAM_ATTR handleEncoderISR() {
         // Read current state of CLK and DT
-        uint8_t currState = (digitalRead(ENCODER_CLK_PIN) << 1) | digitalRead(ENCODER_DT_PIN);
+        uint8_t pinState = (digitalRead(ENCODER_CLK_PIN) << 1) | digitalRead(ENCODER_DT_PIN);
         
-        // Form 4-bit index: (prev_A, prev_B, curr_A, curr_B)
-        uint8_t index = (prevState << 2) | currState;
-        prevState = currState;
+        // Lookup next state
+        encoderState = ttable[encoderState & 0x0f][pinState];
         
-        switch (index) {
-            // Clockwise transitions
-            case 0b1101: // 11 -> 01
-            case 0b0100: // 01 -> 00
-            case 0b0010: // 00 -> 10
-            case 0b1011: // 10 -> 11
-                rawEncoderDelta++;
-                break;
-                
-            // Counter-clockwise transitions
-            case 0b1110: // 11 -> 10
-            case 0b1000: // 10 -> 00
-            case 0b0001: // 00 -> 01
-            case 0b0111: // 01 -> 11
-                rawEncoderDelta--;
-                break;
+        // Check if we completed a rotation
+        uint8_t result = encoderState & 0x30;
+        if (result == DIR_CW) {
+            rawEncoderDelta++;
+        } else if (result == DIR_CCW) {
+            rawEncoderDelta--;
         }
     }
 
@@ -47,7 +66,7 @@ namespace ControlsManager {
         pinMode(ENCODER_SW_PIN, INPUT_PULLUP);
 
         // Initialize starting state
-        prevState = (digitalRead(ENCODER_CLK_PIN) << 1) | digitalRead(ENCODER_DT_PIN);
+        encoderState = R_START;
 
         // Attach CHANGE interrupts to BOTH CLK and DT for full quadrature tracking
         attachInterrupt(digitalPinToInterrupt(ENCODER_CLK_PIN), handleEncoderISR, CHANGE);
@@ -55,23 +74,12 @@ namespace ControlsManager {
     }
 
     void update() {
-        // 1. Read and clear encoder raw delta
-        int rawDelta = 0;
+        // 1. Read and clear encoder raw delta (each tick is exactly one detent click)
+        int delta = 0;
         noInterrupts();
-        rawDelta = rawEncoderDelta;
+        delta = rawEncoderDelta;
         rawEncoderDelta = 0;
         interrupts();
-
-        // 2. Accumulate ticks and divide by 4 to get detent steps
-        static int accum = 0;
-        int delta = 0;
-        if (rawDelta != 0) {
-            accum += rawDelta;
-            if (abs(accum) >= 4) {
-                delta = accum / 4;
-                accum = accum % 4;
-            }
-        }
 
         // 2. Read SW switch press with debouncing
         static bool lastSwState = HIGH;
