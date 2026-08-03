@@ -34,7 +34,6 @@ namespace DisplayManager {
     // Helper to get shortened mode names that fit on the 128px screen width
     const char* getShortModeName(VisualizerMode mode) {
         switch (mode) {
-            case MODE_DIYHUE:             return "External";
             case MODE_RAINBOW_WAVE:       return "Rainbow";
             case MODE_SOUND_RIPPLES:      return "Ripple";
             case MODE_LAVA_LAMP:          return "Lava";
@@ -87,21 +86,28 @@ namespace DisplayManager {
         // Header Title (Current Menu Item)
         display.setTextColor(SSD1306_WHITE);
         switch (cursor) {
-            case 0: drawCenteredText("Visualizer Mode", 0, 1); break;
-            case 1: drawCenteredText("LED Brightness", 0, 1); break;
-            case 2: drawCenteredText("Microphone Gain", 0, 1); break;
-            case 3: drawCenteredText("Auto-Cycling", 0, 1); break;
+            case 0: drawCenteredText("Source Select", 0, 1); break;
+            case 1: drawCenteredText("Visualizer Mode", 0, 1); break;
+            case 2: drawCenteredText("LED Brightness", 0, 1); break;
+            case 3: drawCenteredText("Microphone Gain", 0, 1); break;
+            case 4: drawCenteredText("Auto-Cycling", 0, 1); break;
         }
         display.drawFastHLine(0, 9, 128, SSD1306_WHITE);
 
         // Render Focused Parameter Value or Progress Bar
         if (cursor == 0) {
-            drawCenteredText(getShortModeName(LEDManager::getActiveMode()), 26, 2);
+            drawCenteredText(LEDManager::getSourceName(LEDManager::getSource()), 26, 2);
             if (editing) {
                 display.fillTriangle(4, 29, 4, 39, 10, 34, SSD1306_WHITE);
                 display.fillTriangle(124, 29, 124, 39, 118, 34, SSD1306_WHITE);
             }
         } else if (cursor == 1) {
+            drawCenteredText(getShortModeName(LEDManager::getActiveMode()), 26, 2);
+            if (editing) {
+                display.fillTriangle(4, 29, 4, 39, 10, 34, SSD1306_WHITE);
+                display.fillTriangle(124, 29, 124, 39, 118, 34, SSD1306_WHITE);
+            }
+        } else if (cursor == 2) {
             int pct = (int)round((LEDManager::getBrightness() * 100.0) / 255.0);
             if (editing) {
                 // Draw progress bar on the left (80px wide, x=8 to 88)
@@ -124,7 +130,7 @@ namespace DisplayManager {
                 sprintf(buf, "%d%%", pct);
                 drawCenteredText(buf, 26, 2);
             }
-        } else if (cursor == 2) {
+        } else if (cursor == 3) {
             float g = AudioProcessor::getGain();
             if (editing) {
                 // Draw progress bar for gain on the left (0.2x to 5.0x mapped to 0-80px)
@@ -148,7 +154,7 @@ namespace DisplayManager {
                 sprintf(buf, "%.1fx", g);
                 drawCenteredText(buf, 26, 2);
             }
-        } else if (cursor == 3) {
+        } else if (cursor == 4) {
             bool ac = LEDManager::getAutoCycle();
             drawCenteredText(ac ? "ON" : "OFF", 26, 2);
             if (editing) {

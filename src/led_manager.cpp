@@ -4,8 +4,9 @@
 #include <FastLED.h>
 
 CRGB leds[NUM_LEDS];
-static VisualizerMode currentMode = MODE_DIYHUE; // Start with diyHue (External)
-static bool autoCycleEnabled = false;
+static SourceMode currentSource = SOURCE_SOUND;
+static VisualizerMode currentMode = MODE_RAINBOW_WAVE;
+static bool autoCycleEnabled = true;
 
 // Serpentine Index Mapping
 uint16_t getLEDIndex(uint8_t x, uint8_t y) {
@@ -35,50 +36,39 @@ void init() {
 }
 
 void update() {
-    // Choose rendering function based on active mode
-    switch (currentMode) {
-        case MODE_DIYHUE:
-            drawDiyHueColor();
-            break;
-        case MODE_RAINBOW_WAVE:
-            drawRainbowWave();
-            break;
-        case MODE_SOUND_RIPPLES:
-            drawSoundRipples();
-            break;
-        case MODE_LAVA_LAMP:
-            drawLavaLamp();
-            break;
-        case MODE_DIGITAL_RAIN:
-            drawDigitalRain();
-            break;
-        case MODE_AUDIO_PARTICLES:
-            drawAudioParticles();
-            break;
-        case MODE_SPECTRUM_LINEAR:
-            drawSpectrumLinear();
-            break;
-        case MODE_PULSING_TUNNEL:
-            drawPulsingTunnel();
-            break;
-        case MODE_MARIO_RUN:
-            drawMarioRun();
-            break;
-        // case MODE_DIAGNOSTIC_HEART:
-        //     drawDiagnosticHeart();
-        //     break;
-        // case MODE_NOISE:
-        //     drawNoise();
-        //     break;
-        // case MODE_FIRE_PORTAL:
-        //     drawFirePortal();
-        //     break;
-        // case MODE_SUBSCRIBE:
-        //     drawSubscribe();
-        //     break;
-        default:
-            FastLED.clear();
-            break;
+    if (currentSource == SOURCE_WIFI) {
+        drawDiyHueColor();
+    } else {
+        // Choose rendering function based on active mode
+        switch (currentMode) {
+            case MODE_RAINBOW_WAVE:
+                drawRainbowWave();
+                break;
+            case MODE_SOUND_RIPPLES:
+                drawSoundRipples();
+                break;
+            case MODE_LAVA_LAMP:
+                drawLavaLamp();
+                break;
+            case MODE_DIGITAL_RAIN:
+                drawDigitalRain();
+                break;
+            case MODE_AUDIO_PARTICLES:
+                drawAudioParticles();
+                break;
+            case MODE_SPECTRUM_LINEAR:
+                drawSpectrumLinear();
+                break;
+            case MODE_PULSING_TUNNEL:
+                drawPulsingTunnel();
+                break;
+            case MODE_MARIO_RUN:
+                drawMarioRun();
+                break;
+            default:
+                FastLED.clear();
+                break;
+        }
     }
     
     FastLED.show();
@@ -92,21 +82,34 @@ void setMode(VisualizerMode mode) {
     }
 }
 
+SourceMode getSource() {
+    return currentSource;
+}
+
+void setSource(SourceMode source) {
+    currentSource = source;
+    FastLED.clear();
+    Serial.printf("[LED] Source changed to: %s\n", getSourceName(currentSource));
+}
+
+const char* getSourceName(SourceMode source) {
+    switch (source) {
+        case SOURCE_SOUND: return "Sound";
+        case SOURCE_WIFI:  return "WiFi";
+        default:           return "Unknown";
+    }
+}
+
 void nextMode() {
     uint8_t next = (uint8_t)currentMode + 1;
     if (next >= MODE_COUNT) {
         next = 0;
-    }
-    // Skip the External visualizer (MODE_DIYHUE = 0) if auto-cycling is enabled
-    if (autoCycleEnabled && next == MODE_DIYHUE) {
-        next = 1;
     }
     setMode((VisualizerMode)next);
 }
 
 const char* getModeName(VisualizerMode mode) {
     switch (mode) {
-        case MODE_DIYHUE:             return "External";
         case MODE_RAINBOW_WAVE:       return "Rainbow Wave";
         case MODE_SOUND_RIPPLES:      return "Sound Ripples";
         case MODE_LAVA_LAMP:          return "Lava Lamp";

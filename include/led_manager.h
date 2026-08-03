@@ -3,9 +3,13 @@
 
 #include <Arduino.h>
 
+enum SourceMode {
+    SOURCE_SOUND = 0,
+    SOURCE_WIFI
+};
+
 enum VisualizerMode {
-    MODE_DIYHUE = 0,
-    MODE_RAINBOW_WAVE,
+    MODE_RAINBOW_WAVE = 0,
     MODE_SOUND_RIPPLES,
     MODE_LAVA_LAMP,
     MODE_DIGITAL_RAIN,
@@ -21,6 +25,10 @@ enum VisualizerMode {
 };
 
 namespace LEDManager {
+    // Get/Set current input source (Sound or WiFi)
+    SourceMode getSource();
+    void setSource(SourceMode source);
+    const char* getSourceName(SourceMode source);
     // Initialize the FastLED setup, grid dimensions, and safe brightness level
     void init();
 

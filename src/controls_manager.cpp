@@ -7,8 +7,6 @@
 namespace ControlsManager {
     ControlState currentState = STATE_NAV;
     int menuCursor = 0;
-    const int NUM_MENU_ITEMS = 4;
-
     // State machine states
     #define R_START 0x0
     #define R_CW_FINAL 0x1
@@ -98,14 +96,20 @@ namespace ControlsManager {
             }
         }
 
+        // Determine number of items based on source
+        int numItems = (LEDManager::getSource() == SOURCE_WIFI) ? 1 : 5;
+        if (menuCursor >= numItems) {
+            menuCursor = 0;
+        }
+
         // 3. Process inputs based on state machine
         if (currentState == STATE_NAV) {
             // Handle menu navigation
             if (delta != 0) {
                 menuCursor += delta;
-                // Clamp menu cursor between 0 and NUM_MENU_ITEMS - 1
-                if (menuCursor < 0) menuCursor = NUM_MENU_ITEMS - 1;
-                if (menuCursor >= NUM_MENU_ITEMS) menuCursor = 0;
+                // Clamp menu cursor between 0 and numItems - 1
+                if (menuCursor < 0) menuCursor = numItems - 1;
+                if (menuCursor >= numItems) menuCursor = 0;
                 
                 Serial.printf("[Controls] Menu cursor: %d\n", menuCursor);
             }
@@ -118,7 +122,14 @@ namespace ControlsManager {
             // Handle editing values
             if (delta != 0) {
                 switch (menuCursor) {
-                    case 0: { // Mode Selection
+                    case 0: { // Source Selection
+                        SourceMode currentSrc = LEDManager::getSource();
+                        SourceMode nextSrc = (currentSrc == SOURCE_SOUND) ? SOURCE_WIFI : SOURCE_SOUND;
+                        LEDManager::setSource(nextSrc);
+                        Serial.printf("[Controls] Source changed to: %s\n", LEDManager::getSourceName(nextSrc));
+                        break;
+                    }
+                    case 1: { // Mode Selection
                         int currentModeInt = (int)LEDManager::getActiveMode();
                         currentModeInt += delta;
                         if (currentModeInt < 0) currentModeInt = (int)MODE_COUNT - 1;
@@ -128,7 +139,7 @@ namespace ControlsManager {
                         Serial.printf("[Controls] Mode changed to: %s\n", LEDManager::getModeName((VisualizerMode)currentModeInt));
                         break;
                     }
-                    case 1: { // Brightness (Step by 5%, 0% to 100%)
+                    case 2: { // Brightness (Step by 5%, 0% to 100%)
                         int currentPct = (int)round((LEDManager::getBrightness() * 100.0) / 255.0);
                         int nextPct = currentPct + delta * 5;
                         if (nextPct < 0) nextPct = 0;
@@ -139,7 +150,7 @@ namespace ControlsManager {
                         Serial.printf("[Controls] Brightness changed to: %d%% (%d/255)\n", nextPct, b);
                         break;
                     }
-                    case 2: { // Gain (Step by 0.2, 0.2 to 5.0)
+                    case 3: { // Gain (Step by 0.2, 0.2 to 5.0)
                         float g = AudioProcessor::getGain();
                         g += delta * 0.2f;
                         if (g < 0.2f) g = 0.2f;
@@ -149,7 +160,7 @@ namespace ControlsManager {
                         Serial.printf("[Controls] Gain changed to: %.1f\n", g);
                         break;
                     }
-                    case 3: { // Auto-Cycle (Toggle)
+                    case 4: { // Auto-Cycle (Toggle)
                         bool ac = LEDManager::getAutoCycle();
                         ac = !ac; // Any turn toggles it
                         LEDManager::setAutoCycle(ac);

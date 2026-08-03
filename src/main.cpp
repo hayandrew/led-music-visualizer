@@ -118,7 +118,7 @@ void loop() {
   DiyHueManager::update();
   if (DiyHueManager::hasNewCommand()) {
       DiyHueManager::clearNewCommand();
-      LEDManager::setMode(MODE_DIYHUE);
+      LEDManager::setSource(SOURCE_WIFI);
   }
 
   // 1. Run FFT calculation if background I2S buffer is filled
@@ -127,7 +127,7 @@ void loop() {
     AudioProcessor::clearNewBufferFlag();
   }
 
-  // 2. Auto-cycle visualizer modes every 5 seconds (if enabled)
+  // 2. Auto-cycle visualizer modes every 5 seconds (if enabled and source is Sound)
   static unsigned long lastModeSwitch = millis();
   static VisualizerMode lastActiveMode = LEDManager::getActiveMode();
   VisualizerMode currentMode = LEDManager::getActiveMode();
@@ -137,15 +137,15 @@ void loop() {
     lastModeSwitch = millis();
   }
 
-  if (LEDManager::getAutoCycle() && (millis() - lastModeSwitch >= 5000)) {
+  if (LEDManager::getSource() == SOURCE_SOUND && LEDManager::getAutoCycle() && (millis() - lastModeSwitch >= 5000)) {
     lastModeSwitch = millis();
     LEDManager::nextMode();
   }
 
-  // 3. Handle Serial commands to switch modes manually
+  // 3. Handle Serial commands to switch modes manually (if source is Sound)
   if (Serial.available()) {
     char c = Serial.read();
-    if (c == 'n' || c == ' ') {
+    if ((c == 'n' || c == ' ') && LEDManager::getSource() == SOURCE_SOUND) {
       LEDManager::nextMode();
       lastModeSwitch = millis();
     } else if (c >= '0' && c <= '6') {
