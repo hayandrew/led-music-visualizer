@@ -26,18 +26,23 @@ void drawDiagnosticHeart() {
         basePulse = 0.9f - 0.05f * sin(t * PI);
     }
 
-    float env = AudioProcessor::getVolumeEnvelope();
-    float netEnv = env - 50.0f;
-    if (netEnv < 0.0f) netEnv = 0.0f;
+    float* bands = AudioProcessor::getFrequencyBands();
+    // Use the max of Sub-Bass (band 0) and Bass (band 1) to capture a robust beat/drum signal
+    float bassVal = max(bands[0], bands[1]);
+    float soundFactor = bassVal;
 
-    // Significantly increased sensitivity (maxRef from 45000.0f down to 3200.0f)
-    float maxRef = 3200.0f;
-    float normEnv = netEnv / maxRef;
-    if (normEnv > 1.0f) normEnv = 1.0f;
-    float soundFactor = sqrt(normEnv);
+    // Smooth the soundFactor over time to create fluid attack and decay animations
+    static float smoothedBass = 0.0f;
+    if (soundFactor > smoothedBass) {
+        // Animate up (attack phase) - fast response
+        smoothedBass = smoothedBass * 0.50f + soundFactor * 0.50f;
+    } else {
+        // Animate down (decay phase) - smooth decay
+        smoothedBass = smoothedBass * 0.90f + soundFactor * 0.10f;
+    }
 
-    // Make the heart scale starting from 0.0 (fully invisible by default) up to 1.1
-    float baselineScale = 1.1f * soundFactor;
+    // Base scale of 0.25 (resting heart size) up to 1.1 (fully expanded heart)
+    float baselineScale = 0.25f + 0.85f * smoothedBass;
     float pulseScale = baselineScale * (0.85f + 0.15f * basePulse);
 
     float cx = (MATRIX_WIDTH - 1) / 2.0f;     
@@ -61,7 +66,7 @@ void drawDiagnosticHeart() {
             float heartVal = a * a * a - dx * dx * dy * dy * dy;
 
             if (heartVal <= 0.0f) {
-                uint8_t redVal = 180 + 75 * soundFactor;
+                uint8_t redVal = 180 + 75 * smoothedBass;
                 leds[idx] = CRGB(redVal, 0, 30);
             } else {
                 float bgIntensity = 3.0f + 8.0f * (pulseScale - 0.25f);

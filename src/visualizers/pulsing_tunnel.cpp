@@ -7,10 +7,21 @@
 // 12. Pulsing Tunnel (Concentric color rings expanding from center, pulsing to the beat)
 void drawPulsingTunnel() {
     static float timeOffset = 0;
-    float env = AudioProcessor::getVolumeEnvelope();
     
-    // Speed up ring expansion with audio volume (faster passing bands)
-    float speed = 3.0f + (env / 1500.0f) * 7.0f;
+    float* bands = AudioProcessor::getFrequencyBands();
+    // Use the max of Sub-Bass (band 0) and Bass (band 1) to track the beat
+    float bassVal = max(bands[0], bands[1]);
+    
+    // Smooth the beat input to avoid jittery flicker
+    static float smoothedBeat = 0.0f;
+    if (bassVal > smoothedBeat) {
+        smoothedBeat = smoothedBeat * 0.6f + bassVal * 0.4f; // Quick attack
+    } else {
+        smoothedBeat = smoothedBeat * 0.88f + bassVal * 0.12f; // Smooth decay
+    }
+    
+    // Speed up ring expansion with the beat
+    float speed = 3.0f + smoothedBeat * 7.0f;
     timeOffset += speed;
     if (timeOffset >= 256.0f) {
         timeOffset -= 256.0f;
@@ -39,9 +50,9 @@ void drawPulsingTunnel() {
                 bri = map(wave, 150, 255, 0, 255);
             }
             
-            // Entire tunnel pulses in brightness with the beat (scaled by band brightness to preserve black bars)
-            uint8_t volBoost = constrain((int)(env / 15.0f), 0, 150);
-            uint8_t finalBri = qadd8(bri, (uint8_t)(volBoost * (bri / 255.0f)));
+            // Scale overall brightness directly with the beat (dimmer when quiet, fully bright on beat)
+            float brightnessScale = 0.15f + 0.85f * smoothedBeat;
+            uint8_t finalBri = (uint8_t)(bri * brightnessScale);
             
             // Spectrum of colors shifting along the radius
             uint8_t hue = baseHue + (uint8_t)(dist * 16);

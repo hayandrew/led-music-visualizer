@@ -22,5 +22,7 @@ void drawDigitalRain();
 void drawPulsingTunnel();
 void drawMarioRun();
 void drawLavaLamp();
+void drawAudioPlasma();
+void drawAudioParticles();
 
 #endif // VISUALIZERS_H

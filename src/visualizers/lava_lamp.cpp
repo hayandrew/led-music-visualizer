@@ -39,8 +39,20 @@ void drawLavaLamp() {
     uint8_t blobHue = (uint8_t)hueOffset;
     uint8_t bgHue = (uint8_t)(hueOffset + 96); // Contrasting liquid background
 
-    // Keep lava lamp at a constant brightness (no sound-reactivity for brightness)
-    float soundMult = 1.0f;
+    float* bands = AudioProcessor::getFrequencyBands();
+    // Use the max of Sub-Bass (band 0) and Bass (band 1) to track the beat
+    float bassVal = max(bands[0], bands[1]);
+
+    // Smooth the beat input to create a fluid pulsing effect
+    static float smoothedBeat = 0.0f;
+    if (bassVal > smoothedBeat) {
+        smoothedBeat = smoothedBeat * 0.60f + bassVal * 0.40f; // Quick attack
+    } else {
+        smoothedBeat = smoothedBeat * 0.88f + bassVal * 0.12f; // Smooth decay
+    }
+
+    // Scale lava lamp blob brightness with the beat (dimmer when quiet, very bright on beats)
+    float soundMult = 0.3f + 0.9f * smoothedBeat;
 
     for (uint8_t x = 0; x < MATRIX_WIDTH; x++) {
         for (uint8_t y = 0; y < MATRIX_HEIGHT; y++) {

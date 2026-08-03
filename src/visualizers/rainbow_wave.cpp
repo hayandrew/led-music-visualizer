@@ -7,18 +7,19 @@
 // 9. Rainbow Wave (Swirling rainbow whose speed is driven by audio intensity)
 void drawRainbowWave() {
     static float hueOffset = 0;
-    float env = AudioProcessor::getVolumeEnvelope();
+    float* bands = AudioProcessor::getFrequencyBands();
+    // Use the max of Sub-Bass (band 0) and Bass (band 1) to track the beat
+    float bassVal = max(bands[0], bands[1]);
     
-    // Modulate wave rotation speed based on sound envelope
-    float speed = 0.3f + (env / 3000.0f) * 2.0f;
+    // Modulate wave rotation speed based on the quadratic bass value
+    // Minimum slow movement speed of 1.0, scaling up to 9.0 on strong beats
+    float speed = 1.0f + (bassVal * bassVal) * 8.0f;
     hueOffset += speed;
     if (hueOffset >= 256.0f) hueOffset -= 256.0f;
 
-    // Saturation and brightness breathing based on volume
-    uint8_t sat = 255 - constrain((int)(env / 100.0f), 0, 40);
-    uint8_t minBri = 80;
-    uint8_t maxBri = 255;
-    uint8_t bri = minBri + constrain((int)(env / 25.0f), 0, maxBri - minBri);
+    // Keep saturation and brightness at constant full values
+    uint8_t sat = 255;
+    uint8_t bri = 255;
 
     for (uint8_t x = 0; x < MATRIX_WIDTH; x++) {
         for (uint8_t y = 0; y < MATRIX_HEIGHT; y++) {
