@@ -11,9 +11,6 @@ uint16_t getLEDIndex(uint8_t x, uint8_t y);
 
 void drawDiagnosticHeart();
 void drawSpectrumLinear();
-void drawSpectrumSymmetric();
-void drawVUMeter();
-void drawBassPulse();
 void drawSoundRipples();
 void drawNoise();
 void drawRainbowWave();
@@ -22,7 +19,6 @@ void drawDigitalRain();
 void drawPulsingTunnel();
 void drawMarioRun();
 void drawLavaLamp();
-void drawAudioPlasma();
 void drawAudioParticles();
 
 #endif // VISUALIZERS_H

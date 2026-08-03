@@ -6,9 +6,6 @@
 enum VisualizerMode {
     MODE_DIAGNOSTIC_HEART = 0,
     MODE_SPECTRUM_LINEAR,
-    MODE_SPECTRUM_SYMMETRIC,
-    MODE_VU_METER,
-    MODE_BASS_PULSE,
     MODE_SOUND_RIPPLES,
     MODE_NOISE,
     MODE_RAINBOW_WAVE,
@@ -17,7 +14,6 @@ enum VisualizerMode {
     MODE_PULSING_TUNNEL,
     MODE_MARIO_RUN,
     MODE_LAVA_LAMP,
-    MODE_AUDIO_PLASMA,
     MODE_AUDIO_PARTICLES,
     MODE_COUNT // Keeps track of total modes
 };

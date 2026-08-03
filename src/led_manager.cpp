@@ -43,15 +43,6 @@ void update() {
         case MODE_SPECTRUM_LINEAR:
             drawSpectrumLinear();
             break;
-        case MODE_SPECTRUM_SYMMETRIC:
-            drawSpectrumSymmetric();
-            break;
-        case MODE_VU_METER:
-            drawVUMeter();
-            break;
-        case MODE_BASS_PULSE:
-            drawBassPulse();
-            break;
         case MODE_SOUND_RIPPLES:
             drawSoundRipples();
             break;
@@ -75,9 +66,6 @@ void update() {
             break;
         case MODE_LAVA_LAMP:
             drawLavaLamp();
-            break;
-        case MODE_AUDIO_PLASMA:
-            drawAudioPlasma();
             break;
         case MODE_AUDIO_PARTICLES:
             drawAudioParticles();
@@ -110,9 +98,6 @@ const char* getModeName(VisualizerMode mode) {
     switch (mode) {
         case MODE_DIAGNOSTIC_HEART:   return "Diagnostic Heart";
         case MODE_SPECTRUM_LINEAR:    return "Linear Spectrum";
-        case MODE_SPECTRUM_SYMMETRIC: return "Spectrum";
-        case MODE_VU_METER:           return "VUMeter";
-        case MODE_BASS_PULSE:         return "Pulse";
         case MODE_SOUND_RIPPLES:      return "Sound Ripples";
         case MODE_NOISE:              return "Ambient Noise";
         case MODE_RAINBOW_WAVE:       return "Rainbow Wave";
@@ -121,7 +106,6 @@ const char* getModeName(VisualizerMode mode) {
         case MODE_PULSING_TUNNEL:     return "Pulsing Tunnel";
         case MODE_MARIO_RUN:          return "Super Mario Run";
         case MODE_LAVA_LAMP:          return "Lava Lamp";
-        case MODE_AUDIO_PLASMA:       return "Plasma";
         case MODE_AUDIO_PARTICLES:    return "Particle";
         default:                      return "Unknown";
     }

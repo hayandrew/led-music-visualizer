@@ -36,9 +36,6 @@ namespace DisplayManager {
         switch (mode) {
             case MODE_DIAGNOSTIC_HEART:   return "Heart";
             case MODE_SPECTRUM_LINEAR:     return "Linear";
-            case MODE_SPECTRUM_SYMMETRIC:   return "Spectrum";
-            case MODE_VU_METER:           return "VUMeter";
-            case MODE_BASS_PULSE:         return "Pulse";
             case MODE_SOUND_RIPPLES:       return "Ripple";
             case MODE_NOISE:               return "Noise";
             case MODE_RAINBOW_WAVE:       return "Rainbow";
@@ -47,7 +44,6 @@ namespace DisplayManager {
             case MODE_PULSING_TUNNEL:     return "Tunnel";
             case MODE_MARIO_RUN:          return "Mario";
             case MODE_LAVA_LAMP:          return "Lava";
-            case MODE_AUDIO_PLASMA:       return "Plasma";
             case MODE_AUDIO_PARTICLES:    return "Particle";
             default:                       return "Visual";
         }

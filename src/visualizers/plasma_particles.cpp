@@ -4,42 +4,7 @@
 #include "project_config.h"
 #include <FastLED.h>
 
-// 15. Audio Plasma (Morphing color fields driven by audio spectrum)
-void drawAudioPlasma() {
-    static float xOffset = 0.0f;
-    static float yOffset = 0.0f;
-    static float colorOffset = 0.0f;
 
-    float* bands = AudioProcessor::getFrequencyBands();
-    float bass = max(bands[0], bands[1]); // Sub-bass/Bass
-    float mids = (bands[2] + bands[3] + bands[4]) / 3.0f; // Mids
-    float treble = max(bands[5], bands[6]); // Treble
-
-    // Animate offsets
-    xOffset += 1.0f + bass * 8.0f;
-    yOffset += 0.8f + mids * 6.0f;
-    colorOffset += 0.4f + treble * 5.0f;
-
-    // Zoom factor driven by mids (smaller value = zoom in, larger value = zoom out)
-    float zoom = 30.0f + mids * 40.0f;
-
-    for (uint8_t x = 0; x < MATRIX_WIDTH; x++) {
-        for (uint8_t y = 0; y < MATRIX_HEIGHT; y++) {
-            // Generate noise values for warping
-            uint8_t noiseVal1 = inoise8((uint16_t)(x * zoom + xOffset), (uint16_t)(y * zoom));
-            uint8_t noiseVal2 = inoise8((uint16_t)(x * zoom), (uint16_t)(y * zoom + yOffset));
-
-            // Combine noise to get complex plasma behavior
-            uint8_t hue = (uint8_t)(noiseVal1 + noiseVal2 + colorOffset);
-            uint8_t bri = inoise8((uint16_t)(x * zoom - xOffset), (uint16_t)(y * zoom - yOffset));
-            
-            // Scale brightness to be fully responsive
-            uint8_t finalBri = map(bri, 0, 255, 60, 255);
-
-            leds[getLEDIndex(x, y)] = CHSV(hue, 240, finalBri);
-        }
-    }
-}
 
 // 16. Audio Particles (Fireflies rising from bottom of matrix, reacting to audio)
 struct Particle {
