@@ -44,15 +44,6 @@ void update() {
         case MODE_SPECTRUM_LINEAR:
             drawSpectrumLinear();
             break;
-        // case MODE_SPECTRUM_SYMMETRIC:
-        //     drawSpectrumSymmetric();
-        //     break;
-        // case MODE_VU_METER:
-        //     drawVUMeter();
-        //     break;
-        // case MODE_BASS_PULSE:
-        //     drawBassPulse();
-        //     break;
         case MODE_SOUND_RIPPLES:
             drawSoundRipples();
             break;

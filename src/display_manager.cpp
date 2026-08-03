@@ -34,19 +34,19 @@ namespace DisplayManager {
     // Helper to get shortened mode names that fit on the 128px screen width
     const char* getShortModeName(VisualizerMode mode) {
         switch (mode) {
-            case MODE_DIAGNOSTIC_HEART:   return "Heartbeat";
+            case MODE_DIAGNOSTIC_HEART:   return "Heart";
             case MODE_SPECTRUM_LINEAR:     return "Linear";
             // case MODE_SPECTRUM_SYMMETRIC:   return "Sym Spec";
             // case MODE_VU_METER:           return "VU Meter";
             // case MODE_BASS_PULSE:         return "BassPulse";
-            case MODE_SOUND_RIPPLES:       return "Ripples";
+            case MODE_SOUND_RIPPLES:       return "Ripple";
             case MODE_NOISE:               return "Noise";
             case MODE_RAINBOW_WAVE:       return "Rainbow";
-            case MODE_FIRE_PORTAL:        return "Fire Portal";
-            case MODE_DIGITAL_RAIN:       return "Digi Rain";
+            case MODE_FIRE_PORTAL:        return "Flames";
+            case MODE_DIGITAL_RAIN:       return "Rain";
             case MODE_PULSING_TUNNEL:     return "Tunnel";
-            case MODE_MARIO_RUN:          return "Mario Run";
-            case MODE_LAVA_LAMP:          return "Lava Lamp";
+            case MODE_MARIO_RUN:          return "Mario";
+            case MODE_LAVA_LAMP:          return "Lava";
             default:                       return "Visual";
         }
     }

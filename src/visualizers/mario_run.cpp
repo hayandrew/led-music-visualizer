@@ -1,5 +1,4 @@
 #include "visualizers.h"
-#include "led_manager.h"
 #include "audio_processor.h"
 #include "project_config.h"
 #include <FastLED.h>
