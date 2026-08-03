@@ -21,5 +21,6 @@ void drawMarioRun();
 void drawLavaLamp();
 void drawAudioParticles();
 void drawDiyHueColor();
+void drawSubscribe();
 
 #endif // VISUALIZERS_H

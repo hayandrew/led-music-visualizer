@@ -4,7 +4,8 @@
 #include <Arduino.h>
 
 enum VisualizerMode {
-    MODE_DIAGNOSTIC_HEART = 0,
+    MODE_DIYHUE = 0,
+    MODE_DIAGNOSTIC_HEART,
     MODE_SPECTRUM_LINEAR,
     MODE_SOUND_RIPPLES,
     MODE_NOISE,
@@ -15,7 +16,7 @@ enum VisualizerMode {
     MODE_MARIO_RUN,
     MODE_LAVA_LAMP,
     MODE_AUDIO_PARTICLES,
-    MODE_DIYHUE,
+    MODE_SUBSCRIBE,
     MODE_COUNT // Keeps track of total modes
 };
 

@@ -4,8 +4,8 @@
 #include <FastLED.h>
 
 CRGB leds[NUM_LEDS];
-static VisualizerMode currentMode = MODE_SPECTRUM_LINEAR; // Start with linear spectrum
-static bool autoCycleEnabled = true;
+static VisualizerMode currentMode = MODE_DIYHUE; // Start with diyHue (External)
+static bool autoCycleEnabled = false;
 
 // Serpentine Index Mapping
 uint16_t getLEDIndex(uint8_t x, uint8_t y) {
@@ -73,6 +73,9 @@ void update() {
         case MODE_DIYHUE:
             drawDiyHueColor();
             break;
+        case MODE_SUBSCRIBE:
+            drawSubscribe();
+            break;
         default:
             FastLED.clear();
             break;
@@ -94,6 +97,10 @@ void nextMode() {
     if (next >= MODE_COUNT) {
         next = 0;
     }
+    // Skip the External visualizer (MODE_DIYHUE = 0) if auto-cycling is enabled
+    if (autoCycleEnabled && next == MODE_DIYHUE) {
+        next = 1;
+    }
     setMode((VisualizerMode)next);
 }
 
@@ -110,7 +117,8 @@ const char* getModeName(VisualizerMode mode) {
         case MODE_MARIO_RUN:          return "Super Mario Run";
         case MODE_LAVA_LAMP:          return "Lava Lamp";
         case MODE_AUDIO_PARTICLES:    return "Particle";
-        case MODE_DIYHUE:             return "diyHue Control";
+        case MODE_DIYHUE:             return "External";
+        case MODE_SUBSCRIBE:          return "Subscribe";
         default:                      return "Unknown";
     }
 }
