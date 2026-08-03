@@ -6,6 +6,7 @@
 #include "audio_processor.h"
 #include "controls_manager.h"
 #include "display_manager.h"
+#include "diyhue_manager.h"
 
 void setup() {
   // Initialize Serial logging
@@ -99,6 +100,9 @@ void setup() {
   ControlsManager::init();
   DisplayManager::init();
 
+  // Initialize diyHue Network Client
+  DiyHueManager::init();
+
   Serial.println("=== Setup Complete. Entering loop ===\n");
 }
 
@@ -109,6 +113,13 @@ void loop() {
   // Update physical controls state and OLED display drawing
   ControlsManager::update();
   DisplayManager::update();
+
+  // Update diyHue client and handle automatic mode switching on command
+  DiyHueManager::update();
+  if (DiyHueManager::hasNewCommand()) {
+      DiyHueManager::clearNewCommand();
+      LEDManager::setMode(MODE_DIYHUE);
+  }
 
   // 1. Run FFT calculation if background I2S buffer is filled
   if (AudioProcessor::isNewBufferReady()) {

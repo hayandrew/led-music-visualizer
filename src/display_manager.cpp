@@ -45,6 +45,7 @@ namespace DisplayManager {
             case MODE_MARIO_RUN:          return "Mario";
             case MODE_LAVA_LAMP:          return "Lava";
             case MODE_AUDIO_PARTICLES:    return "Particle";
+            case MODE_DIYHUE:             return "diyHue";
             default:                       return "Visual";
         }
     }

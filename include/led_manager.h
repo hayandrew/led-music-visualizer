@@ -15,6 +15,7 @@ enum VisualizerMode {
     MODE_MARIO_RUN,
     MODE_LAVA_LAMP,
     MODE_AUDIO_PARTICLES,
+    MODE_DIYHUE,
     MODE_COUNT // Keeps track of total modes
 };
 

@@ -20,5 +20,6 @@ void drawPulsingTunnel();
 void drawMarioRun();
 void drawLavaLamp();
 void drawAudioParticles();
+void drawDiyHueColor();
 
 #endif // VISUALIZERS_H

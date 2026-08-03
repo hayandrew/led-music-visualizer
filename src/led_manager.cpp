@@ -70,6 +70,9 @@ void update() {
         case MODE_AUDIO_PARTICLES:
             drawAudioParticles();
             break;
+        case MODE_DIYHUE:
+            drawDiyHueColor();
+            break;
         default:
             FastLED.clear();
             break;
@@ -107,6 +110,7 @@ const char* getModeName(VisualizerMode mode) {
         case MODE_MARIO_RUN:          return "Super Mario Run";
         case MODE_LAVA_LAMP:          return "Lava Lamp";
         case MODE_AUDIO_PARTICLES:    return "Particle";
+        case MODE_DIYHUE:             return "diyHue Control";
         default:                      return "Unknown";
     }
 }
