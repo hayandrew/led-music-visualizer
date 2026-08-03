@@ -37,26 +37,26 @@ void init() {
 void update() {
     // Choose rendering function based on active mode
     switch (currentMode) {
-        case MODE_DIAGNOSTIC_HEART:
-            drawDiagnosticHeart();
-            break;
-        case MODE_SPECTRUM_LINEAR:
-            drawSpectrumLinear();
-            break;
-        case MODE_SOUND_RIPPLES:
-            drawSoundRipples();
-            break;
-        case MODE_NOISE:
-            drawNoise();
+        case MODE_DIYHUE:
+            drawDiyHueColor();
             break;
         case MODE_RAINBOW_WAVE:
             drawRainbowWave();
             break;
-        case MODE_FIRE_PORTAL:
-            drawFirePortal();
+        case MODE_SOUND_RIPPLES:
+            drawSoundRipples();
+            break;
+        case MODE_LAVA_LAMP:
+            drawLavaLamp();
             break;
         case MODE_DIGITAL_RAIN:
             drawDigitalRain();
+            break;
+        case MODE_AUDIO_PARTICLES:
+            drawAudioParticles();
+            break;
+        case MODE_SPECTRUM_LINEAR:
+            drawSpectrumLinear();
             break;
         case MODE_PULSING_TUNNEL:
             drawPulsingTunnel();
@@ -64,18 +64,18 @@ void update() {
         case MODE_MARIO_RUN:
             drawMarioRun();
             break;
-        case MODE_LAVA_LAMP:
-            drawLavaLamp();
-            break;
-        case MODE_AUDIO_PARTICLES:
-            drawAudioParticles();
-            break;
-        case MODE_DIYHUE:
-            drawDiyHueColor();
-            break;
-        case MODE_SUBSCRIBE:
-            drawSubscribe();
-            break;
+        // case MODE_DIAGNOSTIC_HEART:
+        //     drawDiagnosticHeart();
+        //     break;
+        // case MODE_NOISE:
+        //     drawNoise();
+        //     break;
+        // case MODE_FIRE_PORTAL:
+        //     drawFirePortal();
+        //     break;
+        // case MODE_SUBSCRIBE:
+        //     drawSubscribe();
+        //     break;
         default:
             FastLED.clear();
             break;
@@ -106,19 +106,19 @@ void nextMode() {
 
 const char* getModeName(VisualizerMode mode) {
     switch (mode) {
-        case MODE_DIAGNOSTIC_HEART:   return "Diagnostic Heart";
-        case MODE_SPECTRUM_LINEAR:    return "Linear Spectrum";
-        case MODE_SOUND_RIPPLES:      return "Sound Ripples";
-        case MODE_NOISE:              return "Ambient Noise";
+        case MODE_DIYHUE:             return "External";
         case MODE_RAINBOW_WAVE:       return "Rainbow Wave";
-        case MODE_FIRE_PORTAL:        return "Fire Portal";
+        case MODE_SOUND_RIPPLES:      return "Sound Ripples";
+        case MODE_LAVA_LAMP:          return "Lava Lamp";
         case MODE_DIGITAL_RAIN:       return "Digital Rain";
+        case MODE_AUDIO_PARTICLES:    return "Particle";
+        case MODE_SPECTRUM_LINEAR:    return "Linear Spectrum";
         case MODE_PULSING_TUNNEL:     return "Pulsing Tunnel";
         case MODE_MARIO_RUN:          return "Super Mario Run";
-        case MODE_LAVA_LAMP:          return "Lava Lamp";
-        case MODE_AUDIO_PARTICLES:    return "Particle";
-        case MODE_DIYHUE:             return "External";
-        case MODE_SUBSCRIBE:          return "Subscribe";
+        // case MODE_DIAGNOSTIC_HEART:   return "Diagnostic Heart";
+        // case MODE_NOISE:              return "Ambient Noise";
+        // case MODE_FIRE_PORTAL:        return "Fire Portal";
+        // case MODE_SUBSCRIBE:          return "Subscribe";
         default:                      return "Unknown";
     }
 }
