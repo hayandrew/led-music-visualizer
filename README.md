@@ -82,14 +82,19 @@ This project is divided into several iterative phases:
 
 1. Clone the repository and open the folder in VS Code / PlatformIO.
 2. Build the project:
+
    ```bash
    pio run
    ```
+
 3. Upload the firmware over USB:
+
    ```bash
    pio run --target upload
    ```
+
 4. Subsequent updates can be flashed wirelessly (OTA) by connecting to the `ESP32C3-Visualizer` Wi-Fi AP and uploading:
+
    ```bash
    pio run --target upload --upload-port <ESP32-AP-IP>
    ```
