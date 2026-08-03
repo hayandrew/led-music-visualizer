@@ -5,7 +5,7 @@
 
 CRGB leds[NUM_LEDS];
 static VisualizerMode currentMode = MODE_SPECTRUM_LINEAR; // Start with linear spectrum
-static bool autoCycleEnabled = false;
+static bool autoCycleEnabled = true;
 
 // Serpentine Index Mapping
 uint16_t getLEDIndex(uint8_t x, uint8_t y) {
